@@ -1,7 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./src"
-    ],
-    "sqltools.connections": [],
-    "sqltools.useNodeRuntime": true
-}

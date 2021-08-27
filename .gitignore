@@ -1,0 +1,5 @@
+.venv
+.vscode
+.cmd_history
+*.db
+__pycache__
