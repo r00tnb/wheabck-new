@@ -48,6 +48,9 @@ class SessionType(enum.Enum):
         '''
         return '.'+str(self.value)
 
+    def __eq__(self, o: object) -> bool:
+        return o.value == self.value
+
 
 class ServerInfo:
     '''用于描述远程服务器的基本信息

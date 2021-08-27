@@ -6,15 +6,15 @@ using System.Threading;
 using System.Runtime.Serialization;
 
 public class Payload{
-    public string Run(){
-        Directory.SetCurrentDirectory(Global.pwd);
+    public static string run(){
+        Directory.SetCurrentDirectory(Globals.pwd);
         Mutex mut = new Mutex(false, "test123");
         mut.WaitOne();
-        if(File.Exists(Global.infile)){
-            File.Delete(Global.infile);
+        if(File.Exists(Globals.infile)){
+            File.Delete(Globals.infile);
         }
-        if(File.Exists(Global.outfile)){
-            File.Delete(Global.outfile);
+        if(File.Exists(Globals.outfile)){
+            File.Delete(Globals.outfile);
         }
         mut.ReleaseMutex();
         return "";

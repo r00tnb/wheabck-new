@@ -2,8 +2,7 @@
 //global: $pwd, $outfile
 ignore_user_abort(true);
 set_time_limit(0);
-chdir($pwd);
-$ret = array("code"=>1, "msg"=>"");
+
 function iswin(){
     return strpos(strtoupper(PHP_OS), "WIN")===0;
 }
@@ -17,28 +16,35 @@ function readall($stream){
     }
     return $result;
 }
-if(file_exists($outfile)){
-    while(true){
-        $out = fopen($outfile, "rb+");
-        flock($out, LOCK_EX);
-        $msg = readall($out);
-        ftruncate($out, 0);
-        rewind($out);
-        fflush($out);
-        flock($out, LOCK_UN);
-        fclose($out);
-        if($msg != ''){
-            $ret['msg'] = base64_encode($msg);
-            break;
+
+function run($vars){
+    extract($vars);
+    chdir($pwd);
+    $ret = array("code"=>1, "msg"=>"");
+    
+    if(file_exists($outfile)){
+        while(true){
+            $out = fopen($outfile, "rb+");
+            flock($out, LOCK_EX);
+            $msg = readall($out);
+            ftruncate($out, 0);
+            rewind($out);
+            fflush($out);
+            flock($out, LOCK_UN);
+            fclose($out);
+            if($msg != ''){
+                $ret['msg'] = base64_encode($msg);
+                break;
+            }
+            if(!file_exists($outfile)){
+                $ret['code'] = -1;
+                break;
+            }
+            //sleep(1);
+            usleep(200000);
         }
-        if(!file_exists($outfile)){
-            $ret['code'] = -1;
-            break;
-        }
-        //sleep(1);
-        usleep(200000);
+    }else{
+        $ret['code'] = -1;
     }
-}else{
-    $ret['code'] = -1;
+    return json_encode($ret);
 }
-echo json_encode($ret);

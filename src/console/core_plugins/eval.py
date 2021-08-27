@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Type, Union
 from api import Plugin, Command, Cmdline, CommandReturnCode, CommandType, Session, logger, Payload
 import argparse
+from api.maintype.info import SessionType
 from src.core.sessionadapter import SessionAdapter
 from src.console.sessionmanager import ManagerSession
 from src.core.connectionmanager import Connection
@@ -12,7 +13,7 @@ def get_plugin_class():
 
 class EvalPlugin(Plugin, Command):
     name = 'eval'
-    description = 'Execute payload and get the result'
+    description = '执行Payload代码并获取结果'
 
     def __init__(self):
         self.parse = argparse.ArgumentParser(prog=self.name, description=self.description)
@@ -45,6 +46,17 @@ class EvalPlugin(Plugin, Command):
         return self.eval_payload(payload, vars)
 
     def eval_payload(self, payload:str, vars:List[str])->CommandReturnCode:
+        if self.session.session_type == SessionType.PHP:
+            payload = r'''
+            function run($vars){
+                extract($vars);
+                ob_start();
+                %s
+                $result = ob_get_contents();
+                ob_end_clean();
+                return $result;
+            }
+            '''%payload
         ret = self.session.eval(Payload.create_payload(payload.encode(), self.analysis_vars(vars), self.session.session_type))
         if ret is not None:
             print(ret.decode(self.session.options.get_option('encoding')))

