@@ -47,29 +47,28 @@ class Payload:
 
 class CSharpPayload(Payload):
     '''C# payload执行规则
-        参数：全局类Globals的静态属性
-        输入：C#源代码，必须实现一个含有run静态方法的Payload类。
+        输入：C#源代码，必须实现一个含有run静态方法的Payload类。其中vars为参数字典
             public class Payload {
-                public static string run() {}
+                public static string run(Dictionary<string, object> vars) {}
             }
         输出：run()函数的返回值
+        入口：ExecPayload类的静态方法call_run()为入口函数,返回值即为run函数的返回值，代码执行器可以无参调用该函数，格式如下
+            public ExecPayload {
+                public static string call_run() {
+                    return Payload.run(vars);
+                }
+            }
     '''
     
-    wrapper_code = r'''%(code)s
+    wrapper_code = r'''
+    import System.Collections.Generic;
 
-    public static class Globals{
-        %(var)s
+    %(code)s
 
-        public static string json_encode(object obj){
-            System.Runtime.Serialization.Json.DataContractJsonSerializer js = new System.Runtime.Serialization.Json.DataContractJsonSerializer(obj.GetType());
-            System.IO.MemoryStream msObj = new System.IO.MemoryStream();
-            js.WriteObject(msObj, obj);
-            msObj.Position = 0;
-            System.IO.StreamReader sr = new System.IO.StreamReader(msObj, System.Text.Encoding.UTF8);
-            string json = sr.ReadToEnd();
-            sr.Close();
-            msObj.Close();
-            return json;
+    public ExecPayload {
+        public static string call_run() {
+            %(vars)s
+            return Payload.run(vars);
         }
     }
     '''
@@ -81,12 +80,12 @@ class CSharpPayload(Payload):
         # 删除所有注释
         result = PHPPayload.del_note(result).decode()
 
-        cs_global = ''
+        vars = 'Dictionary<string, object> vars = new Dictionary<string, object>();'
         for k, v in self._global.items():
             t, v = self.python_to_cs(v)
-            cs_global += f"public static {t} {k}={v};\n"
+            vars += f'vars.Add("{k}", {v});'
 
-        result = CSharpPayload.wrapper_code % {'code':result, 'var':cs_global}
+        result = CSharpPayload.wrapper_code % {'code':result, 'vars':vars}
 
         return result.encode()
     

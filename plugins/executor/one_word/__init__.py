@@ -57,7 +57,7 @@ class AdvancedExecutor(Plugin, CodeExecutor):
         payload = self.get_end_payload(payload)
         try:
             if pwd_type == 'POST':
-                return requests.post(url, data={pwd:payload}, timeout=timeout if timeout else None, proxies={'http':'127.0.0.1:8080'}).content
+                return requests.post(url, data={pwd:payload}, timeout=timeout if timeout else None).content
             elif pwd_type == 'GET':
                 return requests.get(url, params={pwd:payload}, timeout=timeout if timeout else None).content
             elif pwd_type == 'HEADER':

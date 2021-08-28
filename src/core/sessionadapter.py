@@ -151,7 +151,6 @@ class SessionAdapter(Session):
         try:
             self.config.server_info = self.__code_executor.get_server_info()
         except BaseException as e:
-            raise e
             logger.error(f"Failed to get basic server information, reason: {e}")
             return False
         if self.config.server_info is None:
