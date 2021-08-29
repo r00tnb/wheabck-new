@@ -133,7 +133,6 @@ class ConnectionPlugin(Plugin, Command):
             logger.error(f"Connection `{conn_id}` not exists")
             return CommandReturnCode.FAIL
         s = SessionAdapter(conn)
-        logger.info(f"Session `{s.session_id}` created")
         if s.init_session():
             self.manager_session.add_session(s)
             self.manager_session.set_current_session(s.session_id)

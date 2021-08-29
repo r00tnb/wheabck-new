@@ -12,6 +12,7 @@ class CommandReturnCode(enum.Enum):
     SUCCESS = enum.auto() # 命令执行成功
     FAIL = enum.auto() # 命令因错误而执行失败
     PARTIAL_SUCCESS = enum.auto() # 命令处理多个请求但只有部分成功
+    CANCEL = enum.auto() # 命令询问是否执行，但用户选择了取消
 
 @enum.unique
 class CommandType(enum.Enum):
@@ -101,6 +102,7 @@ class SessionOptions:
         self.__options:Dict[str, List[Any, str]] = {# session的选项字典， 键为选项名， 值的第一项为选项值，第二项为该选项的描述
             'target':['http://xxx.com/1.php', "An HTTP link to the target"],# webshell的url地址
             'encoding':['utf8', 'The encoding used by the current session'],# 默认编码
+            'editor':['vim', '当前默认编辑器文件路径或系统命令'],# 默认编辑器
             'timeout':[30, 'HTTP request timeout (in seconds). If it is set to 0, it will wait indefinitely'],# 每次请求的超时时间，单位秒，设置为0则表示无限等待请求完成
             'preferred_session_type':[SessionType.PHP.name, f"Preferred session type, like {','.join([t.name for t in list(SessionType)])}"], # 首选session类型，一般指定当前session的类型 
             'wrapper_id':['', 'Current payload wrapper ID'],# 使用的payload包装器id,当为None时则不使用包装器

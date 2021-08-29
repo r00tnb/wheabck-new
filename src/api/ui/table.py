@@ -239,7 +239,7 @@ class Tablor:
                                  '|' if border else gap)+'\n'
 
             # 画头部和数据的分割线
-            tmp_border_line = ['-'*len(t) for t in table[0]] if not border else border_line
+            tmp_border_line = ['-'*self._str_width(t) for t in table[0]] if not border else border_line
             result += indent + \
                 self.__draw_line(tmp_border_line, width_list, aligning_list, 
                                  '+' if border else gap, padding='-' if border else ' ')+'\n'

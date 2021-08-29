@@ -62,8 +62,7 @@ class PluginManager:
                     continue
                 if self.load_plugin(plugin_path, basename):
                     w += 1
-                else:
-                    logger.error(f"Load plugin `{plugin_path}` failed!")
+
             return w
 
         for plugin_dir in plugin_dirs:
@@ -95,19 +94,25 @@ class PluginManager:
         func_name = 'get_plugin_class'
         path = os.path.abspath(path)
         module = utils.load_module(path)
-        if not module or not hasattr(module, func_name):
+        if not module:
+            logger.error(f"加载插件`{path}`失败，这不是一个Python模块!")
+            return False
+        if not hasattr(module, func_name):
+            logger.error(f"加载插件`{path}`失败，未定义`{func_name}`函数!")
             return False
         get_plugin_class:Callable[[], Type[Plugin]] = getattr(module, func_name)
         try:
             plugin_class = get_plugin_class()
             if not issubclass(plugin_class, Plugin):
+                logger.error(f"加载插件`{path}`失败，导出的不是一个Plugin派生类!")
                 return False
-        except:
+        except BaseException as e:
+            logger.error(f"加载插件`{path}`失败，产生了异常：{e}!")
             return False
         else:
             ID = basename+'/'+os.path.splitext(os.path.basename(path))[0]
             if ID in self.__plugin_map:
-                raise Exception(f"There are duplicate plugins, at {ID}")
+                raise Exception(f"加载插件`{path}`出现了同名ID`{ID}`")
             self.__plugin_map[ID] = plugin_class
             plugin_class.plugin_id = ID
         return True

@@ -26,7 +26,17 @@ class HelperCommand(Plugin, Command):
         '''返回所有命令的简短信息
         '''
         cmd_info_map = {t:[['Name', 'Description']] for t in CommandType}
-        ret = ''
+        ret = r'''
+开始一个webshell连接：
+    1.set target http://xxx.com/1.php
+    2.set preferred_session_type PHP
+    3.set code_executor_id executor/on_word
+    4.使用set命令设置代码执行器的选项
+    5.设置完毕后使用exploit命令开始一个交互式webshell管理控制台
+快速开始：
+    1.connections -c 1 （从一个已保存的连接开始webshell管理）
+
+'''
         a, b, i = 0, 0, 0
         for p in self.session.command_map.values():
             i += 1

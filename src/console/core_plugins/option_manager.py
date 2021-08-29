@@ -25,6 +25,7 @@ class OptionManagerPlugin(Plugin):
         set_command = SetCommand(self.session)
         self.session.register_command(ShowCommand(self.session))
         self.session.register_command(set_command)
+        self.session.register_complete_func(set_command.complete_ce)
         self.session.register_complete_func(set_command.complete)
 
         if isinstance(self.session, ManagerSession):
@@ -101,6 +102,27 @@ class SetCommand(Command):
         self.session.additional_data.prompt = lambda :colour.colorize(config.app_name, ['bold', 'underline'])+f"({colour.colorize(ID, 'bold', fore='red')})> "
         return CommandReturnCode.SUCCESS
 
+    def complete_ce(self, text:str)->List[str]:
+        """补全set code_executor_id
+
+        Args:
+            text (str): 传入的命令行字符串
+
+        Returns:
+            List[str]: 候选列表
+        """
+        matchs = []
+        m = re.match(r'(set code_executor_id )(\S*)$', text, re.I)
+        if m is None:
+            return matchs
+        ce_id = m.group(2).lower()
+        for p in plugin_manager.get_plugin_list(CodeExecutor):
+            ce:Plugin = p
+            if ce.plugin_id.lower().startswith(ce_id):
+                matchs.append(m.group(1)+ce.plugin_id+' ')
+
+        return matchs
+
     def complete(self, text:str)->List[str]:
         """补全set命令
 
@@ -111,7 +133,7 @@ class SetCommand(Command):
             List[str]: 候选列表
         """
         matchs = []
-        m = re.match(r'(set )([\w_]*)', text, re.I)
+        m = re.match(r'(set )([\w_]*)$', text, re.I)
         if m is None:
             return matchs
         name = m.group(2).lower()
@@ -161,3 +183,4 @@ class ShowCommand(Command):
     @property
     def command_type(self) -> CommandType:
         return CommandType.CORE_COMMAND
+

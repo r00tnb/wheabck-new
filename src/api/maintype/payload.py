@@ -1,5 +1,6 @@
 '''插件如何编写payload在该文件定义
 '''
+from logging import setLoggerClass
 import re
 import base64
 from typing import Any, Dict, Tuple
@@ -65,7 +66,7 @@ class CSharpPayload(Payload):
 
     %(code)s
 
-    public ExecPayload {
+    public class ExecPayload {
         public static string call_run() {
             %(vars)s
             return Payload.run(vars);
@@ -124,7 +125,8 @@ class PHPPayload(Payload):
     wrapper_code = r'''
     %(code)s
     function call_run(){
-        return run(array(%(vars)s));
+        %(vars)s
+        return run($vars);
     }
     '''
 
@@ -137,10 +139,10 @@ class PHPPayload(Payload):
         result = re.sub(r'^\s*<\?php\s*|\s*\?>\s*$', '', result.decode(errors='ignore'))
 
         # 添加参数
-        vars = []
+        vars = '$vars = array();'
         for k, v in self._vars.items():
-            vars.append(f'"{k}"=>{self.python_to_php(v)}')
-        result = PHPPayload.wrapper_code % {'vars':','.join(vars), 'code':result}
+            vars += f'$vars["{k}"] = {self.python_to_php(v)};'
+        result = PHPPayload.wrapper_code % {'vars':vars, 'code':result}
 
         return result.encode()
     

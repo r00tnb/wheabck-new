@@ -48,6 +48,14 @@ class AdvancedExecutor(Plugin, CodeExecutor):
         """
         if self.session.session_type == SessionType.PHP:
             payload += b'echo call_run();'
+        elif self.session.session_type == SessionType.ASP_NET_CS:
+            payload = r'''
+            public class Wheabck {
+                public static void Run(){
+                    
+                }
+            }
+            '''
         return payload
 
     def eval(self, payload: bytes, timeout: float) -> Union[bytes, None]:
