@@ -121,7 +121,7 @@ class PluginManager:
         return self.__plugin_map.pop(ID)
 
     def get_plugin(self, ID:str, type=Plugin):
-        '''获取指定ID的插件类
+        '''获取指定ID的插件实例
         '''
         plugin = self.__plugin_map.get(ID)
         if plugin and issubclass(plugin, type):

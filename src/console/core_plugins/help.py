@@ -9,9 +9,11 @@ def get_plugin_class():
 class HelperCommand(Plugin, Command):
     name = 'help'
     description = "Get command help information!"
+    command_name = 'help'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self):
-        self.parse = argparse.ArgumentParser(prog=self.name, description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('cmd', help="A command name",  nargs='?')
         self.help_info = self.parse.format_help()
 
@@ -30,7 +32,7 @@ class HelperCommand(Plugin, Command):
 开始一个webshell连接：
     1.set target http://xxx.com/1.php
     2.set preferred_session_type PHP
-    3.set code_executor_id executor/on_word
+    3.set code_executor_id executor/one_word
     4.使用set命令设置代码执行器的选项
     5.设置完毕后使用exploit命令开始一个交互式webshell管理控制台
 快速开始：
@@ -39,7 +41,8 @@ class HelperCommand(Plugin, Command):
 '''
         a, b, i = 0, 0, 0
         for p in self.session.command_map.values():
-            i += 1
+            if p.command_type == CommandType.CORE_COMMAND:
+                i += 1
             cmd_info_map[p.command_type].append([p.command_name, p.description])
             if p.command_name == 'help':
                 a = i
@@ -81,13 +84,6 @@ class HelperCommand(Plugin, Command):
             print(self.all_info())
         return CommandReturnCode.SUCCESS
 
-    @property
-    def command_name(self) -> str:
-        return 'help'
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND
 
     def complete(self, text:str)->List[str]:
         '''自动补全已存在的命令
@@ -104,17 +100,11 @@ class HelperCommand(Plugin, Command):
 
 class HelpAliasCommand(Command):
     description = "This is an alias for `help`"
+    command_name = '?'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self, help:HelperCommand) -> None:
         self.help = help
-
-    @property
-    def command_name(self) -> str:
-        return '?'
-    
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND
 
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
         return self.help.run(cmdline)

@@ -14,9 +14,11 @@ def get_plugin_class():
 class EvalPlugin(Plugin, Command):
     name = 'eval'
     description = '执行Payload代码并获取结果'
+    command_name = 'eval'
+    command_type = CommandType.SYSTEM_COMMAND
 
     def __init__(self):
-        self.parse = argparse.ArgumentParser(prog=self.name, description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('payload', help="String payload", nargs='?')
         self.parse.add_argument('-f', '--file', help="Indicates the path to the payload file")
         self.parse.add_argument('-v', '--vars', help="Variables passed to payload, such as `-v test = 123 id = 123`", nargs='+')
@@ -59,7 +61,7 @@ class EvalPlugin(Plugin, Command):
             '''%payload
         ret = self.session.eval(Payload.create_payload(payload.encode(), self.analysis_vars(vars), self.session.session_type))
         if ret is not None:
-            print(ret.decode(self.session.options.get_option('encoding')))
+            print(ret.decode(self.session.options.get_option('encoding').value))
             return CommandReturnCode.SUCCESS
         else:
             logger.error("Eval failed")
@@ -74,11 +76,3 @@ class EvalPlugin(Plugin, Command):
             name, value = var[:i], var[i+1:].strip('"`\'')
             ret[name] = value
         return ret
-
-    @property
-    def command_name(self) -> str:
-        return self.name
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.SYSTEM_COMMAND

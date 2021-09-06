@@ -9,6 +9,7 @@ from typing import NoReturn, Union
 import tempfile
 import platform
 import ctypes
+import struct
 
 def random_str(length:int=8, words="1234567890abcdef")->str:
     '''生成随机字符串
@@ -17,6 +18,14 @@ def random_str(length:int=8, words="1234567890abcdef")->str:
     for i in range(length):
         index = random.randint(0, len(words)-1)
         ret += words[index]
+    return ret
+
+def random_bytes(length:int=8)->bytes:
+    '''生成随机字节流
+    '''
+    ret = b''
+    for i in range(length):
+        ret += struct.pack('B', random.randint(0, 255))
     return ret
 
 def print_traceback()->NoReturn:
@@ -181,3 +190,63 @@ def kill_thread(threadid: int) -> bool:
     if res != 1:
         return False
     return True
+
+def del_note_1(code:bytes)->bytes:
+    '''删除//和/**/的注释 
+    '''
+    quotes = b"'\"`"
+    length = len(code)
+    end = 0
+    result = b''
+    quote = None
+    while end<length:
+        if code[end:end+1] in quotes:
+            if quote is None:
+                quote = code[end:end+1]
+            elif quote == code[end:end+1]:
+                quote = None
+        elif quote is None and code[end:end+1] == b'/' and end<length-1:
+            end += 1
+            tmp = code[end:end+1]
+            if tmp in b'/*':
+                end += 1
+                while end < length:
+                    if code[end:end+1] == b'\n' and tmp == b'/': # 单行注释
+                        end += 1
+                        break
+                    elif code[end:end+1] == b'*' and tmp == b'*' and end < length-1: # 多行注释
+                        end += 1
+                        if code[end:end+1] == b'/':
+                            end += 1
+                            break
+                    end += 1
+            else:
+                result += b'/'+tmp
+                end += 1
+            continue
+        result += code[end:end+1]
+        end += 1
+    return result
+
+
+def edit_on_editor(data:bytes, editor:str, filename='tempfile')->Union[bytes, None]:
+    """在编辑器中编辑传入数据
+
+    Args:
+        data (bytes): 要编辑的数据字节流
+        editor (str): 编辑器路径或命令
+        filename (str): 编辑器显示的文件名称
+
+    Returns:
+        Union[bytes, None]: 编辑后的数据字节流, 若编辑器打开失败则返回None
+    """
+    fname = filename.replace('/', '_').replace('\\', '_')
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, fname)
+        with open(path, 'wb') as f:
+            f.write(data)
+        if os.system(f"{editor} {path}") != 0:
+            return None
+
+        with open(path, 'rb') as f:
+            return f.read()

@@ -52,7 +52,7 @@ class NamedpipeUnixShell(BaseShell):
                 continue
             ret = json.loads(ret)
             if ret['code'] == 1:
-                data = base64.b64decode(ret['msg'].encode()).decode(self.session.options.get_option('encoding'), 'ignore')
+                data = base64.b64decode(ret['msg'].encode()).decode(self.session.options.get_option('encoding').value, 'ignore')
                 self._lock.acquire()
                 self.last_recv = data
                 self._lock.release()

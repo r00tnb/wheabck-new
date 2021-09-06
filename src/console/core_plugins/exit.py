@@ -7,9 +7,11 @@ def get_plugin_class():
 class ExitPlugin(Plugin, Command):
     name = 'exit'
     description = 'Exit command'
+    command_name = 'exit'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self):
-        self.parse = argparse.ArgumentParser(prog='exit', description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('-y', help="Exit procedure without confirmation", action="store_true")
         self.help_info = self.parse.format_help()
 
@@ -21,11 +23,3 @@ class ExitPlugin(Plugin, Command):
         if not args.y and input('Are you sure you want to exit?(y/n) ').lower() != 'y':
             return CommandReturnCode.FAIL
         return CommandReturnCode.EXIT
-
-    @property
-    def command_name(self) -> str:
-        return 'exit'
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND

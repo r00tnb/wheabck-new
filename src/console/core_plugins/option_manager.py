@@ -1,5 +1,5 @@
 from typing import List, Type, Union
-from api import Plugin, Command, Cmdline, CommandReturnCode, CommandType, Session, CodeExecutor, colour, tablor, SessionType,logger
+from api import Plugin, Command, Cmdline, CommandReturnCode, CommandType, Session, CodeExecutor, colour, tablor, SessionType,logger, Option, Wrapper, CommandExecutor
 import argparse, re, copy
 from api.maintype.info import SessionOptions
 from src.core.sessionadapter import SessionAdapter
@@ -10,6 +10,8 @@ import re
 
 def get_plugin_class():
     return OptionManagerPlugin
+
+changeless_options = ('preferred_session_type', 'code_executor_id', 'wrapper_id') #session中无法修改的选项
 
 class OptionManagerPlugin(Plugin):
     name = 'option manager'
@@ -34,11 +36,13 @@ class OptionManagerPlugin(Plugin):
 class SetCommand(Command):
 
     description = 'Change the option value of the current session'
+    command_name = 'set'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self, session:SessionAdapter) -> None:
         self.session = session
 
-        self.parse = argparse.ArgumentParser(prog='set', description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('name', help="Ooption name")
         self.parse.add_argument('value', help="Options value")
         self.help_info = self.parse.format_help()
@@ -48,22 +52,26 @@ class SetCommand(Command):
         name = args.name
         value = args.value
 
-        if not isinstance(self.session, ManagerSession) and name in ('preferred_session_type', 'code_executor_id'):
-            logger.error(f'This option cannot be changed in current session')
+        if not isinstance(self.session, ManagerSession) and name in changeless_options:
+            logger.error(f'这些选项无法在session中改变！')
             return CommandReturnCode.FAIL
 
         if name == 'code_executor_id':# 若是设置代码执行器，则特殊对待
             return self.select_code_executor(value)
-
-        if self.session.options.set_option(name, value):
-            if name == 'code_executor_id':
-                if self.select_code_executor(value) == CommandReturnCode.FAIL:
-                    return CommandReturnCode.FAIL
+        try:
+            o = self.session.options.get_option(name)
+            if o is None:
+                logger.error(f"选项`{name}`不存在！")
+                return CommandReturnCode.FAIL
+            if name == 'command_executor_id' and not isinstance(self.session, ManagerSession):
+                self.session.set_default_exec(value)
+            else:
+                o.set_value(value)
             logger.info(f"{name} => {value}", True)
-            return CommandReturnCode.SUCCESS
-        else:
-            logger.error(f"Option `{name}` is not exists")
+        except ValueError as e:
+            logger.error(e)
             return CommandReturnCode.FAIL
+        return CommandReturnCode.SUCCESS
     
     def select_code_executor(self, ID:str)->CommandReturnCode:
         """选中一个代码执行器
@@ -76,34 +84,34 @@ class SetCommand(Command):
             logger.error(f'Code executor not found with ID `{ID}`')
             return CommandReturnCode.FAIL
         
-        st = SessionType[self.session.options.get_option('preferred_session_type').upper()]
+        st = SessionType[self.session.options.get_option('preferred_session_type').value.upper()]
         if st not in ce.supported_session_types:
             logger.error(f"The code executor does not support the current session type `{st.name}`")
             return CommandReturnCode.FAIL
 
-        self.session.config.session_type = SessionType[self.session.options.get_option('preferred_session_type')]
+        self.session.config.session_type = SessionType[self.session.options.get_option('preferred_session_type').value]
         options_cache = self.session.additional_data.get('options_cache')
         tmp_options = {}
-        old_ce:Type[Plugin] = plugin_manager.plugins_map.get(self.session.options.get_option('code_executor_id'))
-        if old_ce and old_ce.plugin_id in options_cache: # 清除当前session中上一个代码执行器附加的选项，并将选项值保存到缓存
-            for n in options_cache[old_ce.plugin_id]:
-                options_cache[old_ce.plugin_id][n] = self.session.options.options_map.get(n)
-                self.session.options.del_option(n)
+        old_ce:Type[Plugin] = plugin_manager.plugins_map.get(self.session.options.get_option('code_executor_id').value)
+        if old_ce and old_ce.plugin_id in options_cache: # 清除当前session中上一个代码执行器附加的选项，并将选项值更新到缓存
+            for o in options_cache[old_ce.plugin_id].values():
+                o.set_value(self.session.options.options_map.get(o.name).value)
+                self.session.options.del_option(o.name)
         if ID in options_cache:#若缓存中存在对应执行器的选项则加载缓存
             tmp_options = options_cache[ID]
         else:
-            tmp_options = ce.options
-            options_cache[ID] = copy.deepcopy(ce.options)
+            tmp_options = {n:Option(n, *v) for n, v in ce.options.items()}
+            options_cache[ID] = tmp_options
 
-        for n, v in tmp_options.items():
-            self.session.options.add_option(n, v[0], v[1])
+        for n, o in tmp_options.items():
+            self.session.options.add_option(n, o.value, o.description, o.check)
         
-        self.session.options.set_option('code_executor_id', ID)
+        self.session.options.get_option('code_executor_id').set_value(ID)
         self.session.additional_data.prompt = lambda :colour.colorize(config.app_name, ['bold', 'underline'])+f"({colour.colorize(ID, 'bold', fore='red')})> "
         return CommandReturnCode.SUCCESS
 
     def complete_ce(self, text:str)->List[str]:
-        """补全set code_executor_id
+        """补全code_executor_id, wrapper_id, command_executor_id的设置值
 
         Args:
             text (str): 传入的命令行字符串
@@ -112,15 +120,22 @@ class SetCommand(Command):
             List[str]: 候选列表
         """
         matchs = []
-        m = re.match(r'(set code_executor_id )(\S*)$', text, re.I)
+        m = re.match(r'(set code_executor_id |set wrapper_id |set command_executor_id )(\S*)$', text, re.I)
         if m is None:
             return matchs
-        ce_id = m.group(2).lower()
-        for p in plugin_manager.get_plugin_list(CodeExecutor):
+        ID = m.group(2).lower()
+        t = Plugin
+        if m.group(1) == 'set code_executor_id ':
+            t = CodeExecutor
+        elif m.group(1) == 'set wrapper_id ':
+            t = Wrapper
+        elif m.group(1) == 'set command_executor_id ':
+            t = CommandExecutor
+        
+        for p in plugin_manager.get_plugin_list(t):
             ce:Plugin = p
-            if ce.plugin_id.lower().startswith(ce_id):
+            if ce.plugin_id.lower().startswith(ID):
                 matchs.append(m.group(1)+ce.plugin_id+' ')
-
         return matchs
 
     def complete(self, text:str)->List[str]:
@@ -142,21 +157,15 @@ class SetCommand(Command):
                 matchs.append(m.group(1)+n+' ')
         return matchs
 
-    @property
-    def command_name(self) -> str:
-        return 'set'
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND
-
 
 class ShowCommand(Command):
 
     description = "Displays the current session option information"
+    command_name = 'show'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self, session:SessionAdapter) -> None:
-        self.parse = argparse.ArgumentParser(prog='show', description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('option', help="Information type", choices=['options'], nargs='?', default='options')
         self.help_info = self.parse.format_help()
         self.session = session
@@ -172,15 +181,11 @@ class ShowCommand(Command):
     def show_options(self):
         table = [['Name', 'Value', 'Description']]
         for name, v in self.session.options.options_map.items():
-            value, des = v
+            if name in changeless_options and not isinstance(self.session, ManagerSession):
+                name = colour.colorize(name, ['bold', 'invert'])
+            value = v.value
+            des = v.description
             table.append([name, value, des])
         print(tablor(table, border=False))
 
-    @property
-    def command_name(self) -> str:
-        return 'show'
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND
 

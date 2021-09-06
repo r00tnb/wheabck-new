@@ -2,7 +2,7 @@ from src.api.maintype.info import SessionOptions, SessionType, ServerInfo
 import src.config as config
 import sqlite3
 from typing import Any, Dict, List, Union
-import json
+import json, base64
 import pickle
 
 __all__ = ['Connection', 'connection_manager']
@@ -17,6 +17,49 @@ class Connection:
         self.session_type = SessionType.PHP
         self.server_info = ServerInfo()
 
+    @staticmethod
+    def dumps(conn)->str:
+        """将连接配置转为json字符串
+
+        Args:
+            conn ([type]): 连接对象
+
+        Returns:
+            str: json字符串
+        """
+        ret = {}
+        ret['conn_id'] = conn.conn_id
+        ret['options'] = {}
+        for o in conn.options.options_map.values():
+            ret['options'][o.name] = base64.b64encode(pickle.dumps(o.value)).decode()
+        ret['session_type'] = conn.session_type.name
+        ret['server_info'] =base64.b64encode( pickle.dumps(conn.server_info)).decode()
+        return json.dumps(ret)
+    
+    @staticmethod
+    def loads(data:str):
+        """从json字符串中加载一个Connection对象
+
+        Args:
+            data (str): json字符串
+
+        Returns:
+            Connection: 生成的连接对象
+        """
+        data:dict = json.loads(data)
+        ret = Connection()
+        ret.conn_id = data['conn_id']
+        for n, v in data['options'].items():
+            v = base64.b64decode(v)
+            v = pickle.loads(v)
+            o = ret.options.get_option(n)
+            if o is None:
+                ret.options.add_option(n, v, '')
+            else:
+                o.set_value(v)
+        ret.session_type = SessionType[data['session_type']]
+        ret.server_info = pickle.loads(base64.b64decode(data['server_info']))
+        return ret
 
 class ConnectionManager:
     '''用于管理记录的webshell连接
@@ -90,10 +133,11 @@ class ConnectionManager:
         ret = []
         for row in self.cur.fetchall():
             try:
-                conn:Connection = pickle.loads(row['connection'])
+                conn:Connection = Connection.loads(row['connection'])
                 conn.conn_id = row['conn_id'] # 防止两个id不一致
                 ret.append(conn)
-            except:
+            except Exception as e:
+                raise e
                 continue
         return ret
 
@@ -105,7 +149,7 @@ class ConnectionManager:
         if row is None:
             return None
         try:
-            conn:Connection = pickle.loads(row['connection'])
+            conn:Connection = Connection.loads(row['connection'])
             conn.conn_id = row['conn_id'] # 防止两个id不一致
             return conn
         except:
@@ -128,27 +172,33 @@ class ConnectionManager:
         except:
             return False
 
-    def add_or_update_connection(self, connection:Connection)->bool:
+    def add_or_update_connection(self, connection:Connection)->int:
         """添加或更新连接信息, 当连接id存在时更新，否则新增
 
         Args:
             connection (Connection): 连接对象
 
         Returns:
-            bool: 操作成功返回True，否则False
+            int: 操作成功返回添加或更新的连接id，失败返回-1
         """
         try:
             if self.get_connection(connection.conn_id) is None:# 添加
-                self.cur.execute(f'insert into {self.conn_table_name}(connection) values (?)', (pickle.dumps(connection),))
+                value = Connection.dumps(connection)
+                self.cur.execute(f'insert into {self.conn_table_name}(connection) values (?)', (value,))
                 self.conn.commit()
-                return True
+                self.cur.execute(f'select conn_id from {self.conn_table_name} where connection=?', (value, ))
+                row = self.cur.fetchone()
+                if row is None:
+                    return -1
+                return row['conn_id']
             else:#更新
                 self.cur.execute(f'update {self.conn_table_name} set connection=? where conn_id=?', 
-                (pickle.dumps(connection), connection.conn_id))
+                (Connection.dumps(connection), connection.conn_id))
                 self.conn.commit()
-                return True
+                return connection.conn_id
         except Exception as e:
-            return False
+            raise e
+            return -1
 
 
 connection_manager = ConnectionManager()

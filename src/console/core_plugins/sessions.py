@@ -9,11 +9,13 @@ def get_plugin_class():
 class SessionManage(Plugin, Command):
     name = 'sessions'
     description = "Manage session"
+    command_name = 'sessions'
+    command_type = CommandType.CORE_COMMAND
 
     manager_session:ManagerSession # 记录当前session管理的实例
 
     def __init__(self):
-        self.parse = argparse.ArgumentParser(prog=self.name, description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('-i', '--interact', help="Switch to the specified session with session id")
         self.parse.add_argument('-k', '--kill', help="Delete the specified session with session id(If not specified, all sessions will be deleted)", nargs='*')
         self.parse.add_argument('-l', '--list', help="List all active sessions", action='store_true')
@@ -93,7 +95,7 @@ class SessionManage(Plugin, Command):
         for ID, session in self.manager_session.session_map.items():
             if session is not self.manager_session.current_session:
                 active_id += 1
-            table.append([session.session_id, session, session.options.get_option('target')])
+            table.append([session.session_id, session, session.options.get_option('target').value])
 
         print(tablor(table, border=False, pos=active_id))
 
@@ -103,33 +105,20 @@ class SessionManage(Plugin, Command):
         if isinstance(self.session, ManagerSession):
             self.kill_session(list(self.manager_session.session_map.keys()))
 
-    @property
-    def command_name(self) -> str:
-        return self.name
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND
 
 class BgCommand(Command):
 
     description = 'Switch the session to the background'
+    command_name = 'bg'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self, session:ManagerSession) -> None:
-        self.parse = argparse.ArgumentParser(prog='bg', description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.help_info = self.parse.format_help()
         self.session = session
 
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
         s = self.session.current_session
-        self.session.set_current_session(self.session)
+        self.session.set_current_session(None)
         logger.info(f"Background session `{s.session_id}`")
         return CommandReturnCode.SUCCESS
-
-    @property
-    def command_name(self) -> str:
-        return 'bg'
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND

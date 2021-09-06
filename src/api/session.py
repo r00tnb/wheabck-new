@@ -6,7 +6,7 @@ from .command import Command
 from .executor import CommandExecutor
 from .maintype.payload import Payload
 from .maintype.info import AdditionalData, CommandReturnCode, CommandType, SessionOptions, SessionType, ServerInfo
-from typing import Any,Dict, List, Union, Callable
+from typing import Any,Dict, List, Tuple, Union, Callable
 
 
 class Session(metaclass=abc.ABCMeta):
@@ -59,6 +59,14 @@ class Session(metaclass=abc.ABCMeta):
             AdditionalData: 额外数据字典
         """
 
+    @abc.abstractproperty
+    def plugins_list(self):
+        """返回当前session加载的插件实例列表
+
+        Returns:
+            Tuple[Plugin, ...]: 插件实例列表
+        """
+
     ## 方法
 
     @abc.abstractmethod
@@ -88,7 +96,7 @@ class Session(metaclass=abc.ABCMeta):
         '''
     
     @abc.abstractmethod
-    def evalfile(self, payload_path:str, vars:Dict[str, Any]={}, timeout:float=-1)->Union[bytes, None]:
+    def evalfile(self, payload_path:str, vars:Dict[str, Any]={}, timeout:float=None)->Union[bytes, None]:
         '''执行指定路径下的payload文件并获取执行结果。
         若传入的文件路径不带后缀，该方法将根据当前session类型读取同目录下相应的payload文件。
         该方法会根据session类型自动构造对应的payload实例并调用eval方法执行（若文件后缀不是session支持的则会构造失败）。
@@ -108,12 +116,15 @@ class Session(metaclass=abc.ABCMeta):
         '''
 
     @abc.abstractmethod
-    def set_default_exec(self, executor:CommandExecutor)->bool:
-        '''设置默认的命令执行器，它会影响exec方法
+    def set_default_exec(self, plugin_id:str)->bool:
+        """设置当前默认的命令执行器，将会从当前session已加载的插件中寻找
 
-        :param executor: 命令执行器实例，若参数非法，则不会设置成功
-        :returns: 成功返回True，失败返回False
-        '''
+        Args:
+            plugin_id (str): 命令执行器的插件ID
+
+        Returns:
+            bool: 成功返回True，否则False
+        """
 
     @abc.abstractmethod
     def register_complete_func(self, func:Callable[[str], List[str]]):
@@ -133,11 +144,11 @@ class Session(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def call_command(self, cmdline:Cmdline)->Union[CommandReturnCode, None]:
+    def call_command(self, cmdline:Union[Cmdline, List[str], str])->Union[CommandReturnCode, None]:
         """执行一个当前session中的命令
 
         Args:
-            cmdline (Cmdline): 将要执行的命令行
+            cmdline (Union[Cmdline, List[str], str]): 将要执行的命令行，可以是Cmdline实例，字符串列表或字符串
 
         Returns:
             Union[CommandReturnCode, None]: 返回命令行的返回代码,若命令行解析错误则返回None（如命令不存在等）

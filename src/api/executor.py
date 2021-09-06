@@ -1,13 +1,14 @@
 import abc
-from typing import Any, Dict, List, Tuple, Union
-from .maintype.info import SessionType, ServerInfo
+from typing import Any, Callable, Dict, List, Tuple, Union
+from .maintype.info import SessionType, ServerInfo, Option
 
 class CodeExecutor(metaclass=abc.ABCMeta):
     '''代码执行器，用于在远程服务器执行任意代码
     '''
 
-    # 返回代码执行器需要使用的额外参数字典(这些参数将会添加到session options选项中),额外参数字典,键为参数名，值为一个列表，其中第一项为默认值，第二项为该参数的描述信息
-    options:Dict[str, Tuple[Any, str]] = {}
+    # 返回代码执行器需要使用的额外参数字典(这些参数将会添加到session options选项中),额外参数字典,
+    # 键为参数名，值为一个列表，其中第一项为默认值，第二项为该参数的描述信息, 第三项若有，应该为可调用对象用于对值进行检查
+    options:Dict[str, Tuple[Any, str, Callable[[str], Any]]] = {}
     
     @abc.abstractmethod
     def get_server_info(self)->Union[ServerInfo, None]:
@@ -19,11 +20,11 @@ class CodeExecutor(metaclass=abc.ABCMeta):
 
 
     @abc.abstractmethod
-    def generate(self, config: Dict[str, Any]={}) -> bytes:
+    def generate(self, config: Dict[str, str]={}) -> bytes:
         """生成webshell服务端文件
 
         Args:
-            config (Dict[str, Any], optional): 若webshell需要根据参数来配置，可通过该参数传入. Defaults to {}.
+            config (Dict[str, Any], optional): 额外选项字典，会覆盖代码执行器额外选项的默认值,必会传入键TYPE指定session类型. Defaults to {}.
 
         Returns:
             bytes: 返回最终生成的webshell字节流

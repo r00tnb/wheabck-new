@@ -11,9 +11,11 @@ def get_plugin_class():
 class ExecPlugin(Plugin, Command, CommandExecutor):
     name = 'exec'
     description = "在远程服务器上执行系统命令"
+    command_name = 'exec'
+    command_type = CommandType.SYSTEM_COMMAND
     
     def __init__(self):
-        self.parse = argparse.ArgumentParser(prog=self.name, description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('command', nargs='?', help="要执行的命令行.")
         self.parse.add_argument("-e", "--raw-executor", help="使用自带的命令执行器执行命令，不指定该选项则使用session配置中的命令执行器", 
             action="store_true")
@@ -94,7 +96,7 @@ class ExecPlugin(Plugin, Command, CommandExecutor):
         else:
             result = self.session.exec(cmd.encode())
         if result is not None:
-            print(result.decode(self.session.options.get_option('encoding')))
+            print(result.decode(self.session.options.get_option('encoding').value))
         else:
             logger.error(f"Command `{cmd}` exec failed!")
             return CommandReturnCode.FAIL
@@ -131,11 +133,3 @@ class ExecPlugin(Plugin, Command, CommandExecutor):
 
         interact_shell.cmdloop()
         return CommandReturnCode.SUCCESS
-
-    @property
-    def command_name(self) -> str:
-        return self.name
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.SYSTEM_COMMAND

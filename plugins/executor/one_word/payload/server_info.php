@@ -2,14 +2,15 @@
 function run($vars){
     $info = array(
         'host'=>$_SERVER['HTTP_HOST'],
-        'pwd'=>__DIR__,
+        'pwd'=>getcwd(),
         'user'=>'', 
         'group'=>'',
         'domain'=>'',
         'os_type'=>PHP_OS, 
         'tmpdir'=>sys_get_temp_dir(),
         'sep'=>DIRECTORY_SEPARATOR,
-        'os_bits'=>32
+        'os_bit'=>32,
+        'ip_addr'=>$_SERVER['SERVER_ADDR']
     );
     if(strpos(strtoupper(PHP_OS), "WIN")===false){
         $tmp = tempnam($info['tmpdir'], "");
@@ -24,10 +25,10 @@ function run($vars){
     
     $int = intval("9223372036854775807");
     if ($int == 9223372036854775807) {
-        $info['os_bits'] = 64;
+        $info['os_bit'] = 64;
     }
     elseif ($int == 2147483647) {
-        $info['os_bits'] = 32;
+        $info['os_bit'] = 32;
     }
     foreach($info as $k=>$v){
         if(is_string($v))

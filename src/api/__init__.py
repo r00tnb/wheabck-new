@@ -10,6 +10,6 @@ from .ui.table import tablor
 from .ui.logger import logger
 from .ui.cmdline import Cmdline
 
-from .maintype.info import ServerInfo, SessionOptions, SessionType, CommandReturnCode, CommandType, OSType
+from .maintype.info import ServerInfo, SessionOptions, SessionType, CommandReturnCode, CommandType, OSType, Option
 from .maintype.payload import Payload, PHPPayload
 from .maintype import utils

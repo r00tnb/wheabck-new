@@ -7,9 +7,11 @@ def get_plugin_class():
 class ClearPlugin(Plugin, Command):
     name = 'lrun'
     description = 'Run local system commands'
+    command_name = 'lrun'
+    command_type = CommandType.CORE_COMMAND
 
     def __init__(self):
-        self.parse = argparse.ArgumentParser(prog=self.name, description=self.description)
+        self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         self.parse.add_argument('cmd', help="Local system command")
         self.help_info = self.parse.format_help()
 
@@ -20,11 +22,3 @@ class ClearPlugin(Plugin, Command):
         args = self.parse.parse_args(cmdline.options)
         os.system(args.cmd)
         return CommandReturnCode.SUCCESS
-
-    @property
-    def command_name(self) -> str:
-        return self.name
-
-    @property
-    def command_type(self) -> CommandType:
-        return CommandType.CORE_COMMAND

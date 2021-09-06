@@ -14,6 +14,9 @@ class CommandReturnCode(enum.Enum):
     PARTIAL_SUCCESS = enum.auto() # 命令处理多个请求但只有部分成功
     CANCEL = enum.auto() # 命令询问是否执行，但用户选择了取消
 
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, CommandReturnCode) and o.value == self.value
+
 @enum.unique
 class CommandType(enum.Enum):
     '''命令类型，预定义命令类型用于给命令分类
@@ -23,6 +26,10 @@ class CommandType(enum.Enum):
     FILE_COMMAND = enum.auto() # 用于文件操作的命令
     MISC_COMMAND = enum.auto() # 杂项命令
     POST_COMMAND = enum.auto() # 后渗透命令
+    GATHER_COMMAND = enum.auto() # 信息收集相关命令
+
+    # def __eq__(self, o: object) -> bool:
+    #     return o.value == self.value
 
 @enum.unique
 class OSType(enum.Enum):
@@ -32,6 +39,9 @@ class OSType(enum.Enum):
     WINDOWS = enum.auto() # Windows类型
     OSX = enum.auto() # mac osx类型
     OTHER = enum.auto() # 其他类型
+
+    def __eq__(self, o: object) -> bool:
+        return o.value == self.value
 
 @enum.unique
 class SessionType(enum.Enum):
@@ -94,51 +104,85 @@ class ServerInfo:
                 setattr(ret, key, value)
         return ret
         
+class Option:
+    '''选项类，用于描述选项信息
+    '''
+    def __init__(self, name:str, value:Any, description:str='', check:Callable[[str], Any]=None) -> None:
+        self.__name = name
+        self.__description = description
+        self.__check:Callable[[str], Any] = (lambda x:x) if check is None else check
+        self.__value = None
+        self.set_value(value)
+
+    @property
+    def value(self)->Any:
+        return self.__value
+    
+    @property
+    def name(self)->str:
+        return self.__name
+
+    @property
+    def description(self)->str:
+        return self.__description
+    
+    def set_value(self, value:Any):
+        """设置选项值
+
+        Args:
+            value (Any): 选项值
+
+        Raises:
+            ValueError: 校验失败则会抛出该异常
+
+        Returns:
+            Union[ValueError, None]: 失败则返回值检查的异常，成功返回None
+        """
+        self.__value = self.check(value)
+    
+    def check(self, value:Any)->Any:
+        """检查值是否合法
+
+        Args:
+            value (Any): 需要校验的值
+
+        Raises:
+            ValueError: 校验失败则会抛出该异常
+
+        Returns:
+            Any: 校验通过的值的正确形式
+        """
+        try:
+            value = self.__check(value)
+        except BaseException as e:
+            raise ValueError(e)
+        return value
 
 class SessionOptions:
     '''session实例使用的选项
     '''
-    def __init__(self) -> None:
-        self.__options:Dict[str, List[Any, str]] = {# session的选项字典， 键为选项名， 值的第一项为选项值，第二项为该选项的描述
-            'target':['http://xxx.com/1.php', "An HTTP link to the target"],# webshell的url地址
-            'encoding':['utf8', 'The encoding used by the current session'],# 默认编码
-            'editor':['vim', '当前默认编辑器文件路径或系统命令'],# 默认编辑器
-            'timeout':[30, 'HTTP request timeout (in seconds). If it is set to 0, it will wait indefinitely'],# 每次请求的超时时间，单位秒，设置为0则表示无限等待请求完成
-            'preferred_session_type':[SessionType.PHP.name, f"Preferred session type, like {','.join([t.name for t in list(SessionType)])}"], # 首选session类型，一般指定当前session的类型 
-            'wrapper_id':['', 'Current payload wrapper ID'],# 使用的payload包装器id,当为None时则不使用包装器
-            'code_executor_id':['', 'Current code executor ID'],# 使用的代码执行器id，必须是有效的id否则session不会创建成功
-            'command_executor_id':['', 'Current command executor ID'], # 当前的命令执行器id， 当为None时则表示无命令执行器
-        }
 
-    def get_option(self, name:str)->Union[Any, None]:
-        """获取指定选项的值和描述信息
+    def __init__(self) -> None:
+        self.__options:Dict[str, Option] = {}
+        self.add_option('target', 'http://xxx.com/1.php', 'webshell连接地址')
+        self.add_option('encoding', 'utf8', '默认编码')
+        self.add_option('editor', 'vim', '默认文本编辑器')
+        self.add_option('timeout', 30, '请求超时时间', float)
+        self.add_option('preferred_session_type', SessionType.PHP.name, '首选session类型')
+        self.add_option('wrapper_id', '', 'payload包装器ID')
+        self.add_option('code_executor_id', '', '代码执行器ID')
+        self.add_option('command_executor_id', '', '命令执行器ID')
+
+    def get_option(self, name:str)->Union[Option, None]:
+        """获取指定选项的值
 
         Args:
             name (str): 选项名
 
         Returns:
-            Union[Any, None]: 选项值，找不到返回None
+            Union[Option, None]: 选项对象，找不到返回None
         """
-        for n, v in self.__options.items():
-            if n == name:
-                return v[0]
-        return None
-
-    def set_option(self, name:str, value:Any)->bool:
-        """设置选项的值
-
-        Args:
-            name (str): 选项名称
-            value (Any): 要设置的值(值必须是简单类型)
-
-        Returns:
-            bool: 成功返回True，失败返回False(一般是选项不存在)
-        """
-        for n, v in self.__options.items():
-            if n==name:
-                v[0] = value
-                return True
-        return False
+        return self.__options.get(name)
 
     def del_option(self, name:str)->bool:
         """删除指定选项
@@ -151,15 +195,19 @@ class SessionOptions:
         """
         return self.__options.pop(name, None) is not None
 
-    def add_option(self, name:str, value:Any, description:str):
+    def add_option(self, name:str, value:Any, description:str, check:Callable[[str], Any]=None):
         """添加一个新选项，可能会覆盖旧的
+
+        Raises:
+            ValueError: 校验失败则会抛出该异常
 
         Args:
             name (str): 选项名称，若存在同名选项则会覆盖
             value (Any): 选项的默认值
             description (str): 选项的描述
+            check (Callable[[str], Any]): 类型检查的可调用对象,若为None，则不对选项进行类型检查
         """
-        self.__options[name] = [value, description]
+        self.__options[name] = Option(name, value, description, check)
 
     def copy(self):
         """返回一个当前实例的副本
@@ -170,10 +218,10 @@ class SessionOptions:
         return copy.deepcopy(self)
 
     @property
-    def options_map(self)->Dict[str, Tuple[Any, str]]:
-        '''获得所有选项字典的一个副本
+    def options_map(self)->Dict[str, Option]:
+        '''获得所有选项字典
         '''
-        return copy.deepcopy(self.__options)
+        return self.__options
 
 
 class AdditionalData(dict):

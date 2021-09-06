@@ -36,7 +36,8 @@ class Tablor:
             },
         ]
 
-    def __call__(self, table: list, header=True, border=True, aligning='left', title='', pos=None, max_width=50, gap=' ', indent='    ', autocolor=True) -> str:
+    def __call__(self, table: list, header=True, border=True, aligning='left', title='', pos=None, pos_str='=>',
+        max_width=50, gap=' ', indent='    ', autocolor=True) -> str:
         '''格式化列表中的内容为表格样式
 
         Description:
@@ -56,14 +57,16 @@ class Tablor:
 
             title 指定表格的标题， 若为空则不绘制
 
-            pos 指定当前选中行， 会绘制一个箭头指向行， pos从1开始
+            pos 指定当前选中行， pos从1开始
+
+            pos_str 字符串将绘制在pos选项指定的行前
 
             max_length 每列的最大宽度，单位字符数, 超过将会自动展开行.指定特定列的方法："50-1, 60-2, 80-3, 120-4"，该字符串可指定特定列的最大宽度，不指定
                     特定列将应用到所有列, 其中50-1里面50指定最大宽度，1指定第1列
 
             gap 当border为假时，指定每列之间的填充字符串
 
-            indent 表格左侧缩进
+            indent 表格左侧缩进字符串
 
             autocolor 为真时将对单元格内容自动着色
 
@@ -74,7 +77,7 @@ class Tablor:
         if table is None or not table or not table[0]:
             return ''
         try:
-            return self.__analyse(table, header=header, border=border, aligning=aligning, title=title, pos=pos, max_width=max_width, gap=gap, indent=indent, autocolor=autocolor)
+            return self.__analyse(table, header=header, border=border, aligning=aligning, title=title, pos=pos, pos_str=pos_str, max_width=max_width, gap=gap, indent=indent, autocolor=autocolor)
         except Exception as e:
             raise TableAnalyseException(e)
 
@@ -120,7 +123,7 @@ class Tablor:
         return result, pos
 
     def __analyse(self, table: list, header: bool, border: bool, aligning="left", title="",
-                  pos=None, max_width=50, gap='   ', indent='    ', autocolor=True) -> str:
+                  pos=None, pos_str='=>', max_width=50, gap='   ', indent='    ', autocolor=True) -> str:
         table, pos = self.__wrap(table, pos, header)
         if autocolor:
             for line in table:  # 对单元格进行着色
@@ -248,7 +251,7 @@ class Tablor:
         i = 1
         for row in table:
             if i == pos:
-                result += colour.colorize('=> '.rjust(len(indent), ' '), 'bold', 'green') + \
+                result += colour.colorize(pos_str.rjust(len(indent), ' '), 'bold', 'green') + \
                     self.__draw_line(
                         row, width_list, aligning_list, '|' if border else gap)+'\n'
             else:

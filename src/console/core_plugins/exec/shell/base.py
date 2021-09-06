@@ -31,7 +31,7 @@ class BaseShell:
                     if msg is None:
                         logger.error(f"执行 `{cmd}` 失败!")
                         continue
-                    print(msg.decode(self.session.options.get_option('encoding'), 'ignore'))
+                    print(msg.decode(self.session.options.get_option('encoding').value, 'ignore'))
         except KeyboardInterrupt:
             pass
 
@@ -78,7 +78,7 @@ class NormalShell(BaseShell):
             if ret['code'] == -1:
                 break
             elif ret['code'] == 1:
-                msg = base64.b64decode(ret['msg'].encode()).decode(self.session.options.get_option('encoding'), 'ignore')
+                msg = base64.b64decode(ret['msg'].encode()).decode(self.session.options.get_option('encoding').value, 'ignore')
                 self._lock.acquire()
                 self.last_recv = msg
                 self._lock.release()

@@ -44,27 +44,27 @@ class SessionAdapter(Session):
 
         # 初始化代码执行器和payload包装器，它们不会加载到__plugin_instance_map中
         self.__code_executor: CodeExecutor = plugin_manager.get_code_executor(
-            self.config.options.get_option('code_executor_id'))
+            self.config.options.get_option('code_executor_id').value)
         if self.__code_executor is not None:
             if self.config.session_type not in self.__code_executor.supported_session_types or not self.__code_executor.on_loading(self):
                 raise SessionInitError(
-                    f'Code executor with ID {self.config.options.get_option("code_executor_id")} is not support the session!')
+                    f'Code executor with ID {self.config.options.get_option("code_executor_id").value} is not support the session!')
         elif strict:
             raise SessionInitError(
-                f'Code executor with ID {self.config.options.get_option("code_executor_id")} is not found!')
+                f'Code executor with ID {self.config.options.get_option("code_executor_id").value} is not found!')
 
-        self.__payload_wrapper: Wrapper = plugin_manager.get_wrapper(self.config.options.get_option('wrapper_id'))
+        self.__payload_wrapper: Wrapper = plugin_manager.get_wrapper(self.config.options.get_option('wrapper_id').value)
         if self.__payload_wrapper is None or self.session_type not in self.__payload_wrapper.supported_session_types or \
                 not self.__payload_wrapper.on_loading(self):
             self.__payload_wrapper = plugin_manager.get_default_wrapper()
-            self.options.set_option('wrapper_id', self.__payload_wrapper.plugin_id)
+            self.options.get_option('wrapper_id').set_value(self.__payload_wrapper.plugin_id)
 
         # 命令执行器一般在__plugin_instance_map中(此时会在加载插件时初始化)，也可能是代码执行器或包装器
         self.__command_executor: CommandExecutor = None
-        if self.config.options.get_option('command_executor_id') == self.config.options.get_option("code_executor_id") and \
+        if self.config.options.get_option('command_executor_id').value == self.config.options.get_option("code_executor_id").value and \
                 isinstance(self.__code_executor, CommandExecutor):
             self.__command_executor = self.__code_executor
-        if self.config.options.get_option('wrapper_id') == self.config.options.get_option('command_executor_id') and \
+        if self.config.options.get_option('wrapper_id').value == self.config.options.get_option('command_executor_id').value and \
                 isinstance(self.__payload_wrapper, CommandExecutor):
             self.__command_executor = self.__payload_wrapper
 
@@ -147,10 +147,11 @@ class SessionAdapter(Session):
         Returns:
             bool: 成功返回True，否则False
         """
-        logger.info(f"Connecting to target `{self.options.get_option('target')}`...")
+        logger.info(f"Connecting to target `{self.options.get_option('target').value}`...")
         try:
             self.config.server_info = self.__code_executor.get_server_info()
         except BaseException as e:
+            raise e
             logger.error(f"Failed to get basic server information, reason: {e}")
             return False
         if self.config.server_info is None:
@@ -176,13 +177,14 @@ class SessionAdapter(Session):
             return False
         plugin = plugin_class()
         if plugin.on_loading(self):
+            self.__plugin_instance_map[utils.random_str()] = plugin
             if isinstance(plugin, Command):# 如果是命令插件则注册命令
                 self.register_command(plugin)
 
-            self.__plugin_instance_map[utils.random_str()] = plugin
-            if self.__command_executor is None and self.config.options.get_option('command_executor_id') == plugin.plugin_id and \
-                    isinstance(plugin, CommandExecutor):  # 初始化命令执行器
+            o = self.options.get_option('command_executor_id')
+            if self.__command_executor is None and o.value == plugin.plugin_id and isinstance(plugin, CommandExecutor):  # 初始化命令执行器
                 self.__command_executor = plugin
+                o.set_value(plugin.plugin_id)
             return True
         return False
 
@@ -226,7 +228,7 @@ class SessionAdapter(Session):
         if self.__payload_wrapper:
             code = self.__payload_wrapper.wrap(code)
         if timeout is None or timeout < 0:
-            timeout = self.config.options.get_option('timeout')
+            timeout = self.config.options.get_option('timeout').value
         return self.__code_executor.eval(code, timeout)
 
     def evalfile(self, payload_path: str, vars: Dict[str, Any] = {}, timeout: float = None) -> Union[bytes, None]:
@@ -247,13 +249,16 @@ class SessionAdapter(Session):
 
     def exec(self, cmd: bytes, timeout: float=-1) -> Union[bytes, None]:
         return self.__command_executor.exec(cmd)
-
-    def set_default_exec(self, executor: CommandExecutor) -> bool:
-        if not issubclass(executor, CommandExecutor):
-            return False
-        self.__command_executor = executor
-        self.config.options.set_option('command_executor_id', plugin_manager.get_plugin_id(executor))
-        return True
+    
+    def set_default_exec(self, plugin_id: str) -> bool:
+        for plugin in self.plugins_list:
+            if plugin.plugin_id == plugin_id:
+                if isinstance(plugin, CommandExecutor):
+                    self.__command_executor = plugin
+                    self.options.get_option('command_executor_id').set_value(plugin_id)
+                    return True
+                break
+        return False
 
     def register_complete_func(self, func: Callable[[str], List[str]]):
         self.__complete_func_list.append(func)
@@ -263,7 +268,9 @@ class SessionAdapter(Session):
             return
         self.__command_map[command.command_name] = command
 
-    def call_command(self, cmdline: Cmdline) -> Union[CommandReturnCode, None]:
+    def call_command(self, cmdline: Union[Cmdline, List[str], str]) -> Union[CommandReturnCode, None]:
+        if isinstance(cmdline, (list, tuple, str)):
+            cmdline = Cmdline(cmdline)
         for c in self.command_map.values():
             if c.command_name == cmdline.cmd:
                 return c.run(cmdline)

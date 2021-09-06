@@ -6,7 +6,7 @@ import base64
 from typing import Any, Dict, Tuple
 
 from .info import SessionType
-from .utils import random_str
+from .utils import random_str, del_note_1
 
 class Payload:
     '''封装payload
@@ -79,7 +79,7 @@ class CSharpPayload(Payload):
         result = self._code
 
         # 删除所有注释
-        result = PHPPayload.del_note(result).decode()
+        result = del_note_1(result).decode()
 
         vars = 'Dictionary<string, object> vars = new Dictionary<string, object>();'
         for k, v in self._global.items():
@@ -133,7 +133,7 @@ class PHPPayload(Payload):
     @property
     def code(self)-> bytes:
         # 删除所有注释
-        result = self.del_note(self._raw_payload)
+        result = del_note_1(self._raw_payload)
 
         # 删除标签和开始结尾的空白符
         result = re.sub(r'^\s*<\?php\s*|\s*\?>\s*$', '', result.decode(errors='ignore'))
@@ -145,44 +145,6 @@ class PHPPayload(Payload):
         result = PHPPayload.wrapper_code % {'vars':vars, 'code':result}
 
         return result.encode()
-    
-    @classmethod
-    def del_note(cls, code:bytes)->bytes:
-        '''删除php注释
-        '''
-        quotes = b"'\"`"
-        length = len(code)
-        end = 0
-        result = b''
-        quote = None
-        while end<length:
-            if code[end:end+1] in quotes:
-                if quote is None:
-                    quote = code[end:end+1]
-                elif quote == code[end:end+1]:
-                    quote = None
-            elif quote is None and code[end:end+1] == b'/' and end<length-1:
-                end += 1
-                tmp = code[end:end+1]
-                if tmp in b'/*':
-                    end += 1
-                    while end < length:
-                        if code[end:end+1] == b'\n' and tmp == b'/': # 单行注释
-                            end += 1
-                            break
-                        elif code[end:end+1] == b'*' and tmp == b'*' and end < length-1: # 多行注释
-                            end += 1
-                            if code[end:end+1] == b'/':
-                                end += 1
-                                break
-                        end += 1
-                else:
-                    result += b'/'+tmp
-                    end += 1
-                continue
-            result += code[end:end+1]
-            end += 1
-        return result
 
     
     def python_to_php(self, var):
