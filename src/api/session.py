@@ -87,33 +87,43 @@ class Session(metaclass=abc.ABCMeta):
         '''
 
     @abc.abstractmethod
-    def eval(self, payload:Payload, timeout:float=None)->Union[bytes, None]:
-        '''执行payload代码并获取执行结果,不会验证payload是否是当前session支持的
+    def eval(self, payload:Payload, timeout:float=-1)->Union[bytes, None]:
+        """执行payload代码并获取执行结果,不会验证payload是否是当前session支持的
 
-        :param payload: payload实例
-        :param timeout: 本次执行payload的超时时间(单位秒)，设置为0则无限等待，设置为小于0或None的则使用默认超时时间
-        :returns: 执行结果，失败返回None
-        '''
+        Args:
+            payload (Payload): payload实例
+            timeout (float, optional): 本次执行payload的超时时间(单位秒)，设置为0则无限等待，设置为小于0则使用默认超时时间. Defaults to -1.
+
+        Returns:
+            Union[bytes, None]: 执行结果，失败返回None
+        """
     
     @abc.abstractmethod
-    def evalfile(self, payload_path:str, vars:Dict[str, Any]={}, timeout:float=None)->Union[bytes, None]:
-        '''执行指定路径下的payload文件并获取执行结果。
+    def evalfile(self, payload_path:str, vars:Dict[str, Any]={}, timeout:float=-1)->Union[bytes, None]:
+        """执行指定路径下的payload文件并获取执行结果。
         若传入的文件路径不带后缀，该方法将根据当前session类型读取同目录下相应的payload文件。
         该方法会根据session类型自动构造对应的payload实例并调用eval方法执行（若文件后缀不是session支持的则会构造失败）。
 
-        :param payload_path: payload文件路径，该路径可以是绝对路径，也可以是相对路径，当为相对路径时，它相对的是调用该方法的文件的路径。
-        :param vars: 向该payload传递的全局变量字典
-        :param timeout: 本次执行payload的超时时间(单位秒)，设置为0则无限等待，设置为小于0或None的则使用默认超时时间
-        :returns: 执行结果，失败返回None
-        '''
+        Args:
+            payload_path (str): payload文件路径，该路径可以是绝对路径，也可以是相对路径，当为相对路径时，它相对的是调用该方法的文件的路径。
+            vars (Dict[str, Any], optional): 向该payload传递的全局变量字典. Defaults to {}.
+            timeout (float, optional): 本次执行payload的超时时间(单位秒)，设置为0则无限等待，设置为小于0则使用默认超时时间. Defaults to -1.
+
+        Returns:
+            Union[bytes, None]: 执行结果，失败返回None
+        """
 
     @abc.abstractmethod
     def exec(self, cmd:bytes, timeout:float=-1)->Union[bytes, None]:
-        '''执行系统命令，并获取命令输出的结果
+        """执行系统命令，并获取命令输出的结果
 
-        :param cmd: 命令字节流
-        :returns: 命令的输出结果，只获取标准输出流内容，对于错误输出需要在命令中使用重定向来获取。若执行错误（系统命令错误之外的错误）则返回None
-        '''
+        Args:
+            cmd (bytes): 命令字节流
+            timeout (float, optional): 本次执行命令的超时时间(单位秒)，设置为0则无限等待，设置为小于0则使用默认超时时间. Defaults to -1.
+
+        Returns:
+            Union[bytes, None]: 命令的输出结果，只获取标准输出流内容，对于错误输出需要在命令中使用重定向来获取。若执行错误（系统命令错误之外的错误）则返回None
+        """
 
     @abc.abstractmethod
     def set_default_exec(self, plugin_id:str)->bool:

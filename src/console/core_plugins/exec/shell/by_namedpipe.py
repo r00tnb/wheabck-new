@@ -32,7 +32,7 @@ class NamedpipeUnixShell(BaseShell):
         self._lock.release()
 
     def _shell(self):# 服务端执行shell
-        self.session.exec(f"{self.shell} >{self.out_pipe} 2>&1 <{self.in_pipe}".encode()) # 阻塞
+        self.session.exec(f"{self.shell} >{self.out_pipe} 2>&1 <{self.in_pipe}".encode(), 0) # 阻塞
         self.close()
 
     def _keep_shell_alive(self):# 连接到管道保持shell一直存活

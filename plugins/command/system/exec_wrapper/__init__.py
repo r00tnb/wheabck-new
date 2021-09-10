@@ -15,7 +15,7 @@ class CommandWrapper:
         self.code = code # Python代码
         self.description = description
 
-    def exec(self, cmd:str, verbose=False)->Union[bytes, None]:
+    def exec(self, cmd:str, verbose=False, timeout:float=-1)->Union[bytes, None]:
         """执行传入的命令
 
         Args:
@@ -31,7 +31,7 @@ class CommandWrapper:
             if verbose:
                 logger.info(f"最终命令行：{cmd}")
             if self.command_executor:
-                return self.command_executor.exec(cmd.encode())
+                return self.command_executor.exec(cmd.encode(), timeout)
         return None
 
 
@@ -65,11 +65,11 @@ class ExecWrapperPlugin(Plugin, Command, CommandExecutor):
     def on_loading(self, session: Session) -> bool:
         return super().on_loading(session)
 
-    def exec(self, cmd: bytes) -> Union[bytes, None]:
+    def exec(self, cmd: bytes, timeout: float) -> Union[bytes, None]:
         cw = self.command_wrappers.get(self.default_wrapper_name)
         if cw is None:
             return None
-        return cw.exec(cmd.decode(errors='ignore'))
+        return cw.exec(cmd.decode(errors='ignore'), timeout=timeout)
 
     def add(self)->CommandReturnCode:
         code = r'''# 编辑你的命令包装器代码

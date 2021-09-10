@@ -37,7 +37,7 @@ class CodeExecutor(metaclass=abc.ABCMeta):
 
         Args:
             payload (bytes): payload的字节流
-            timeout (float): 本次payload的执行中请求的超时时间，为0时则无限等待（这是一个约定，实现该方法时应该实现此特性）
+            timeout (float): 本次payload的执行中请求的超时时间(单位秒)，为0时则无限等待，小于0则使用默认值（这是一个约定，实现该方法时应该实现此特性）
 
         Returns:
             Union[bytes, None]: 返回payload在目标上的执行结果,失败则返回None
@@ -49,11 +49,12 @@ class CommandExecutor(metaclass=abc.ABCMeta):
     '''
 
     @abc.abstractmethod
-    def exec(self, cmd:bytes)->Union[bytes, None]:
+    def exec(self, cmd:bytes, timeout:float)->Union[bytes, None]:
         """在远程服务器执行命令并返回命令执行结果
 
         Args:
             cmd (bytes): 合法的命令字节流
+            timeout (float): 本次命令的执行超时时间(单位秒)，为0时则无限等待，小于0则使用默认值（这是一个约定，实现该方法时应该实现此特性）
 
         Returns:
             Union[bytes, None]: 命令执行结果， 失败返回None

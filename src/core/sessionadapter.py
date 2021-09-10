@@ -223,15 +223,15 @@ class SessionAdapter(Session):
         else:
             connection_manager.update_json_data(self.config.conn_id, name, value)
 
-    def eval(self, payload: Payload, timeout: float = None) -> Union[bytes, None]:
+    def eval(self, payload: Payload, timeout: float = -1) -> Union[bytes, None]:
         code = payload.code
         if self.__payload_wrapper:
             code = self.__payload_wrapper.wrap(code)
-        if timeout is None or timeout < 0:
+        if timeout < 0:
             timeout = self.config.options.get_option('timeout').value
         return self.__code_executor.eval(code, timeout)
 
-    def evalfile(self, payload_path: str, vars: Dict[str, Any] = {}, timeout: float = None) -> Union[bytes, None]:
+    def evalfile(self, payload_path: str, vars: Dict[str, Any] = {}, timeout: float = -1) -> Union[bytes, None]:
         old_dir = os.getcwd()
         os.chdir(os.path.dirname(utils.call_path(2)))  # 切换到调用该函数处的文件所在目录
         if not payload_path.lower().endswith(self.session_type.suffix):
@@ -244,11 +244,12 @@ class SessionAdapter(Session):
 
         return self.eval(p, timeout)
 
-    def exec(self, cmd: bytes) -> Union[bytes, None]:
-        return self.__command_executor.exec(cmd)
-
     def exec(self, cmd: bytes, timeout: float=-1) -> Union[bytes, None]:
-        return self.__command_executor.exec(cmd)
+        if timeout < 0:
+            timeout = self.config.options.get_option('timeout').value
+        if self.__command_executor:
+            return self.__command_executor.exec(cmd, timeout)
+        return None
     
     def set_default_exec(self, plugin_id: str) -> bool:
         for plugin in self.plugins_list:

@@ -44,12 +44,12 @@ class PreloadExecPlugin(Plugin, Command, CommandExecutor):
         logger.error("动态库上传失败！")
         return False
 
-    def exec(self, cmd: bytes) -> Union[bytes, None]:
+    def exec(self, cmd: bytes, timeout: float) -> Union[bytes, None]:
         if self.so_path is None:
             logger.info("开始上传动态库...")
             if not self._upload_so(self.session.server_info.os_bit==64):
                 return None
-        ret = self.session.evalfile('payload/payload', dict(pwd=self.session.server_info.pwd, cmd=cmd, sopath=self.so_path), 0)
+        ret = self.session.evalfile('payload/payload', dict(pwd=self.session.server_info.pwd, cmd=cmd, sopath=self.so_path), timeout)
         if ret is None:
             return None
         ret = json.loads(ret)
@@ -64,7 +64,7 @@ class PreloadExecPlugin(Plugin, Command, CommandExecutor):
 
     def run(self, args: Cmdline)-> int:
         args = self.parse.parse_args(args.options)
-        ret = self.exec(args.cmd.encode())
+        ret = self.exec(args.cmd.encode(), self.session.options.get_option('timeout').value)
         if ret is not None:
             print(ret.decode(self.session.options.get_option('encoding').value, 'ignore'))
         else:

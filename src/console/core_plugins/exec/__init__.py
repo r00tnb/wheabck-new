@@ -75,9 +75,9 @@ class ExecPlugin(Plugin, Command, CommandExecutor):
                 ok[i] = colour.colorize(ok[i], ['bold', 'invert'])
         print("所有可用的命令执行方法: ", '|'.join(ok))
 
-    def exec(self, cmd: bytes) -> Union[bytes, None]:
+    def exec(self, cmd: bytes, timeout: float) -> Union[bytes, None]:
         if self.executor:
-            return self.executor.exec(cmd)
+            return self.executor.exec(cmd, timeout)
         return None
 
     def exec_command_on_server(self, cmd:str, use_raw:bool)->CommandReturnCode:
@@ -92,7 +92,7 @@ class ExecPlugin(Plugin, Command, CommandExecutor):
         """
         result:bytes = None
         if use_raw:
-            result = self.exec(cmd.encode())
+            result = self.exec(cmd.encode(), self.session.options.get_option('timeout').value)
         else:
             result = self.session.exec(cmd.encode())
         if result is not None:

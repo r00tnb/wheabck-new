@@ -27,6 +27,9 @@ class BaseShell:
                     if cmd.lower() == 'exit':
                         self.running = False
                         break
+                    elif cmd == 'clear':
+                        self.session.call_command('clear')
+                        continue
                     msg = self.session.exec(cmd.encode()+b" 2>&1")
                     if msg is None:
                         logger.error(f"执行 `{cmd}` 失败!")

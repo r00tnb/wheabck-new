@@ -28,7 +28,7 @@ class Tablor:
             },
             {
                 'regexp': r'(?:\s+|^)(\d+)(?:$|\s+)',  # 整数
-                'color': ['', 'blue', '']
+                'color': ['bold', 'blue', '']
             },
             {
                 'regexp': r'(?:\s+|^)(True|target)(?:$|\s+)',

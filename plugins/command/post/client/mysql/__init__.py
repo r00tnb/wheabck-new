@@ -105,12 +105,12 @@ class MysqlClientPlugin(Plugin, Command, CommandExecutor):
         print(tablor(table, False, indent=''))
         return CommandReturnCode.SUCCESS
 
-    def exec(self, cmd: bytes) -> Union[bytes, None]:
+    def exec(self, cmd: bytes, timeout: float) -> Union[bytes, None]:
         encoding = self.session.options.get_option('encoding').value
         encode_cmd = cmd.hex()
         sql = f"select {self._exec_func}(unhex('{encode_cmd}'))"
         ret = self.session.evalfile('payload/query', dict(host=self._host, port=self._port, user=self._user, 
-            password=self._password, database=self._current_database, sql=sql))
+            password=self._password, database=self._current_database, sql=sql), timeout)
         if ret is None:
             return None
         ret = json.loads(ret)
@@ -352,7 +352,7 @@ class MysqlClientPlugin(Plugin, Command, CommandExecutor):
         elif args.exec_udf:
             ret = self._exec_udf()
         elif args.exec_cmd:
-            r = self.exec(args.exec_cmd.encode())
+            r = self.exec(args.exec_cmd.encode(), self.session.options.get_option('timeout').value)
             if r is not None:
                 print(r.decode(self.session.options.get_option('encoding'), 'ignore'))
             else:
