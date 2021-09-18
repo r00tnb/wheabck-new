@@ -21,11 +21,11 @@ class ServerInfoPlugin(Plugin, Command):
 
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
         table = [['名称', '值'],
+            ['webshell文件地址', self.session.server_info.webshell_addr],
             ['系统类型', self.session.server_info.os_type.name],
             ['工作目录', self.session.server_info.pwd],
             ['用户名', self.session.server_info.user],
             ['用户组名', self.session.server_info.group],
-            ['网站域名', self.session.server_info.host],
             ['主机域名', self.session.server_info.domain],
             ['IP地址', self.session.server_info.ip_addr],
             ['临时目录', self.session.server_info.tmpdir],

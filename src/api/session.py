@@ -99,7 +99,7 @@ class Session(metaclass=abc.ABCMeta):
         """
     
     @abc.abstractmethod
-    def evalfile(self, payload_path:str, vars:Dict[str, Any]={}, timeout:float=-1)->Union[bytes, None]:
+    def evalfile(self, payload_path:str, vars:Dict[str, Any]={}, timeout:float=-1, find_dir=False)->Union[bytes, None]:
         """执行指定路径下的payload文件并获取执行结果。
         若传入的文件路径不带后缀，该方法将根据当前session类型读取同目录下相应的payload文件。
         该方法会根据session类型自动构造对应的payload实例并调用eval方法执行（若文件后缀不是session支持的则会构造失败）。
@@ -108,6 +108,7 @@ class Session(metaclass=abc.ABCMeta):
             payload_path (str): payload文件路径，该路径可以是绝对路径，也可以是相对路径，当为相对路径时，它相对的是调用该方法的文件的路径。
             vars (Dict[str, Any], optional): 向该payload传递的全局变量字典. Defaults to {}.
             timeout (float, optional): 本次执行payload的超时时间(单位秒)，设置为0则无限等待，设置为小于0则使用默认超时时间. Defaults to -1.
+            find_dir (boll, optional): 当为True时，该函数将会根据当前的session自动在同目录下的对应session类型名（小写）的目录中寻找payload文件，此时payload_path参数必须是一个相对路径，否则可能会出现问题。当为False（默认）时，则不启用该功能。例如：当前session为PHP，则调用evalfile('test', find_dir=True)时，将会在同目录下寻找payload文件php/test.php;当前session为ASP_NET_CS，则调用evalfile('test', find_dir=True)时，将会在同目录下寻找payload文件asp_net_cs/test.cs
 
         Returns:
             Union[bytes, None]: 执行结果，失败返回None
@@ -138,10 +139,12 @@ class Session(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def register_complete_func(self, func:Callable[[str], List[str]]):
-        '''注册一个命令补全函数（在控制台下有效）
+        """注册一个命令补全函数（在控制台下有效）
 
-        :param func: 一个命令补全函数,其中第一个参数为此次请求补全的命令行字符串， 返回值为补全后的字符串候选列表
-        '''
+        Args:
+            func (Callable[[str], List[str]]): 一个命令补全函数,其中第一个参数为此次请求补全的命令行字符串， 返回值为补全后的字符串候选列表
+        """
+
 
     @abc.abstractmethod
     def register_command(self, command:Command):

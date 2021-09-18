@@ -1,5 +1,5 @@
 import os
-import re
+import threading
 from src.api.ui.cmdline import Cmdline
 from src.api.ui.logger import logger
 from src.api.ui.color import colour
@@ -15,6 +15,9 @@ import src.api.maintype.utils as utils
 from .pluginmanager import plugin_manager
 from .connectionmanager import Connection, connection_manager
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
+
+
+lock = threading.Lock() # 用于线程安全 
 
 class SessionInitError(Exception):
     '''session初始化失败的错误
@@ -38,6 +41,7 @@ class SessionAdapter(Session):
         self.__complete_func_list:List[Callable[[str], List[str]]] = [] # 命令补全函数列表
         self.__command_map:Dict[str, Command] = {} # 当前session中注册的命令
         self.__additional_data:AdditionalData = AdditionalData() # 当前session使用的额外数据字典
+
 
         self.register_complete_func(self.command_complete) # 注册默认的命令补全
 
@@ -231,13 +235,17 @@ class SessionAdapter(Session):
             timeout = self.config.options.get_option('timeout').value
         return self.__code_executor.eval(code, timeout)
 
-    def evalfile(self, payload_path: str, vars: Dict[str, Any] = {}, timeout: float = -1) -> Union[bytes, None]:
+    def evalfile(self, payload_path: str, vars: Dict[str, Any] = {}, timeout: float = -1, find_dir=False) -> Union[bytes, None]:
         old_dir = os.getcwd()
+        lock.acquire()
         os.chdir(os.path.dirname(utils.call_path(2)))  # 切换到调用该函数处的文件所在目录
         if not payload_path.lower().endswith(self.session_type.suffix):
             payload_path += self.session_type.suffix
+        if find_dir:
+            payload_path = os.path.join(self.session_type.name.lower(), payload_path)
         code = utils.file_get_content(payload_path)
         os.chdir(old_dir)
+        lock.release()
         if code is None:
             return None
         p = Payload.create_payload(code, vars, self.session_type)
