@@ -26,7 +26,7 @@ class CommandWrapper:
         """
         if self.code:
             a = {'cmd':cmd}
-            exec(self.code, globals(), a)
+            exec(self.code, {}, a)
             cmd = a.get('cmd')
             if verbose:
                 logger.info(f"最终命令行：{cmd}")
@@ -74,6 +74,7 @@ class ExecWrapperPlugin(Plugin, Command, CommandExecutor):
     def add(self)->CommandReturnCode:
         code = r'''# 编辑你的命令包装器代码
 # 使用并更改全局变量cmd，来对命令进行包装甚至更改
+# 不能在全局包含模块，请在使用的作用域下导入并使用模块
 
 cmd = cmd+' 2>&1'
         '''
@@ -135,15 +136,17 @@ cmd = cmd+' 2>&1'
             logger.error("指定的命令执行器不存在！")
             return CommandReturnCode.FAIL
         description = input(f"描述({cw.description})： ")
+        if description == '':
+            description = cw.description
         code = utils.edit_on_editor(cw.code, self.session.options.get_option('editor').value, f'命令包装器-{name}.py')
         if code is None:
             logger.error("编辑器打开失败！")
             return CommandReturnCode.FAIL
 
+        self.command_wrappers.pop(cw.name) # 删除原来的
         self.command_wrappers[name] = CommandWrapper(name, ce, description, code)
         if self.default_wrapper_name == cw.name:
             self.default_wrapper_name = name
-        self.command_wrappers.pop(cw.name)
         logger.info(f"命令包装器`{name}`编辑完毕!", True)
         return CommandReturnCode.SUCCESS
 
@@ -205,8 +208,14 @@ cmd = cmd+' 2>&1'
 
     def on_loaded(self):
         data = self.session.load_json('exec_wrapper-config')
-        if data is None:
-            return
+        if data is None or not data.get('wrappers'):
+            data = {'wrappers':{
+                'sudo':[
+                    self.session.options.get_option('command_executor_id').value,
+                    '命令使用sudo执行，用于提升命令执行权限,若要使用密码需修改源来配置',
+                    'IyDnvJbovpHkvaDnmoTlkb3ku6TljIXoo4Xlmajku6PnoIEKIyDkvb/nlKjlubbmm7TmlLnlhajlsYDlj5jph49jbWTvvIzmnaXlr7nlkb3ku6Tov5vooYzljIXoo4XnlJroh7Pmm7TmlLkKIyDkuI3og73lnKjlhajlsYDljIXlkKvmqKHlnZfvvIzor7flnKjkvb/nlKjnmoTkvZznlKjln5/kuIvlr7zlhaXlubbkvb/nlKjmqKHlnZcKCmRlZiByYW5kb21fc3RyKGM9OCk6CiAgICBpbXBvcnQgcmFuZG9tCiAgICBrZXlzID0gJ2FiY2RlZmdoaWprMTIzNDU2Nzg5MCcgCiAgICByZXQgPSAnJyAKICAgIGZvciBpIGluIHJhbmdlKGMpOgogICAgICAgIHJldCArPSByYW5kb20uY2hvaWNlKGtleXMpCiAgICByZXR1cm4gcmV0CgpzcGVfY2hycyA9ICdcJyIkYCcKCmNoX21hcCA9IHt9CmZvciBjIGluIHNwZV9jaHJzOgogICAgY2hfbWFwW2NdID0gcmFuZG9tX3N0cigpCiAgICBjbWQgPSBjbWQucmVwbGFjZShjLCBjaF9tYXBbY10pCgpzZWRfc3RyaW5nID0gW10KZm9yIGMsIHIgaW4gY2hfbWFwLml0ZW1zKCk6CiAgICBpZiBjID09ICInIjoKICAgICAgICBzZWRfc3RyaW5nLmFwcGVuZCgic2VkIFwicy8lcy8lcy9nXCIiJShyLCBjKSkKICAgIGVsc2U6CiAgICAgICAgc2VkX3N0cmluZy5hcHBlbmQoInNlZCAncy8lcy8lcy9nJyIlKHIsIGMpKQpjbWQgPSAiZXhlYyAyPiYxO2E9XCIlc1wiO2I9JChlY2hvICRhfCVzKTtzdWRvIC1zIHNoIC1jIFwiJGJcIiIlKGNtZCwgJ3wnLmpvaW4oc2VkX3N0cmluZykp'
+                ]
+            }}
         self.default_wrapper_name = data.get('default')
         for name, v in data.get('wrappers', {}).items():
             for plugin in self.session.plugins_list:

@@ -1,17 +1,15 @@
+from math import log
 from typing import Any, Dict, List, Tuple
-from api import Session, logger, colour, tablor, Plugin, Command, CommandReturnCode, CommandType, Cmdline
+from api import Session, logger, colour, tablor, Plugin, Command, CommandReturnCode, CommandType, Cmdline, OSType
 import argparse
 import re
 import socket
 import struct
-import os
 import csv
 import json
-import threading
-import math
 import base64
 from .worker import Worker
-import enum
+import enum, time, os
 
 def get_plugin_class():
     return PortScanPlugin
@@ -19,7 +17,8 @@ def get_plugin_class():
 class  TransType(enum.Enum):
     TCP = 1
     UDP = 2
-    UNKNOWN = 3
+    ALL = 3
+    UNKNOWN = 4
 
     @classmethod
     def from_name(cls, name:str):
@@ -41,7 +40,7 @@ class Port:
 
     def __init__(self, port: int, trans_type: TransType, name:str, note: str=''):
         self.port = port # 端口号
-        self.trans_type = type # 传输协议类型
+        self.trans_type = trans_type # 传输协议类型
         self.name = name # 端口对应服务名称
         self.note = note # 端口注释
 
@@ -59,7 +58,7 @@ class ServicePortMap:
         Args:
             csv_path (str): CSV文件路径
         """
-        self.service_list:List[Port] = [] # 存储端口信息
+        self.__service_list:List[Port] = [] # 存储端口信息
         if csv_path is not None:
             self.add_from_file(csv_path)
 
@@ -74,10 +73,40 @@ class ServicePortMap:
                     port = int(p[1].strip())
                     t = p[2].strip()
                     note = p[3].strip()
-                    self.service_list.append(Port(port, TransType.from_name(t), service, note))
+                    pp = Port(port, TransType.from_name(t), service, note)
+                    if pp in self.__service_list:# 去重
+                        continue
+                    self.append_port(pp)
                 except:
-                    logger.error(f"加载第`{reader.line_num}`行失败!")
+                    logger.debug(f"加载第`{reader.line_num}`行失败!")
+    def add_from_list(self, ports:List[Port]):
+        self.__service_list.extend(ports)
 
+    @property
+    def count(self)->int:
+        return len(self.__service_list)
+    
+    @property
+    def port_list(self)->List[Port]:
+        return self.__service_list.copy()
+
+    def append(self, port: int, trans_type: TransType, name:str, note: str='')->bool:
+        if port:
+            self.__service_list.append(Port(port, trans_type, name, note))
+            return True
+        return False
+
+    def append_port(self, port:Port)->bool:
+        if port:
+            self.__service_list.append(port)
+            return True
+        return False
+    
+    def get(self, port:int, trans_type:TransType)->Port:
+        for p in self.__service_list:
+            if p.port == port and trans_type == p.trans_type:
+                return p
+        return None
 
 
 class PortScanPlugin(Plugin, Command):
@@ -86,70 +115,144 @@ class PortScanPlugin(Plugin, Command):
     command_name = 'portscan'
     command_type = CommandType.POST_COMMAND
 
-    default_ports = ServicePortMap() # 默认要扫描的端口列表
+    default_ports:ServicePortMap = None # 默认要扫描的端口列表
     
     def __init__(self):
         super().__init__()
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
         sub_parses = self.parse.add_subparsers()
         report_parse = sub_parses.add_parser("report", help="查看扫描报告")
+        report_parse.set_defaults(func=self._report)
         report_parse.add_argument('-l', '--list', help="列出所有报告", action='store_true')
-        report_parse.add_argument('-v', '--view', help="查看指定报告ID的报告内容")
-        report_parse.add_argument('-d', '--delete', help="删除指定ID的报告")
+        report_parse.add_argument('-v', '--view', help="查看指定报告ID的报告内容", type=int)
+        report_parse.add_argument('-d', '--delete', help="删除指定ID的报告，指定-1则删除全部", type=int)
 
         scan_parse = sub_parses.add_parser('scan', help="进行端口扫描")
+        scan_parse.set_defaults(func=self._scan)
         scan_parse.add_argument('-n', '--nodetect', help="不进行主机存活检查.", action="store_true")
         scan_parse.add_argument('-U', '--host-detect-udp', help="使用UDP检查主机是否存活（不准确），当没有足够权限时可尝试该方法", action="store_true")
-        scan_parse.add_argument('-T', '--type', help="指定要检查的端口传输协议类型，默认检查所有类型", choices=[t.name for t in TransType])
+        scan_parse.add_argument('-T', '--type', help="指定要检查的端口传输协议类型，默认检查所有类型", choices=[t.name for t in TransType if t!=TransType.UNKNOWN], default='ALL')
         scan_parse.add_argument('-p', '--ports', help="指定要扫描的端口（不指定该参数则扫描默认端口），如：1-65535， 1433 22等.", nargs='+')
         scan_parse.add_argument('-t', '--threads', help="指定扫描的线程数量（默认一个线程）.", default=1, type=int)
         scan_parse.add_argument('--timeout', help="指定等待端口响应的超时时间，单位毫秒（默认1000 ms）.", default=1000, type=int)
         scan_parse.add_argument('hosts', help="指定要扫描的主机，如192.168.1.1/24, 192.168.1.10-192.168.1.100, 192.168.1.2,...", nargs='+')
         self.help_info = self.parse.format_help()
 
-    def run(self, args: Cmdline)-> int:
-        args = self.parse.parse_args(args.options)
-        if args.result:
-            self.show_last_result()
-            return self.SUCCESS
-        
-        hosts = self._parse_hosts(args.hosts)
-        if not hosts:
-            logger.error("No host list!")
-            return self.STOP
+    def on_loading(self, session: Session) -> bool:
+        session.register_complete_func(self.docomplete)
+        return super().on_loading(session)
 
-        self._scan_result = {}
-        logger.info(f"Threads count `{args.threads}`")
-        if args.nodetect:
-            logger.info("Not proceed alive host detection!")
+    def save_report(self, ip:str, open_ports:List[Port]):
+        """保存一条扫描结果
+
+        Args:
+            ip (str): 目标ip地址
+            open_ports (List[Port]): 开发的端口列表
+        """
+        reports = self.session.load_json(self.command_name)
+        if not reports:
+            reports = {}
+        tmp = []
+        for p in open_ports:
+            tmp.append({'port':p.port, 'name':p.name, 'note':p.note, 'trans_type':p.trans_type.name})
+        reports[ip] = tmp
+        self.session.save_json(self.command_name, reports)
+
+    def get_reports(self)->Dict[str, ServicePortMap]:
+        """获取扫描结果
+
+        Returns:
+            Dict[str, ServicePortMap]: 返回结果字典
+        """
+        reports = self.session.load_json(self.command_name)
+        if not reports:
+            return {}
+        for ip, lp in reports.items():
+            tmp = ServicePortMap()
+            for p in lp:
+                tmp.append(p['port'], TransType.from_name(p['trans_type']), p['name'], p['note'])
+            reports[ip] = tmp
+        return reports
+
+
+    def _report(self, args:argparse.Namespace)->CommandReturnCode:
+        reports = self.get_reports()
+        if args.delete:
+            ID = args.delete
+            i = 1
+            for ip in list(reports.keys()):
+                if ID == -1 or ID == i:
+                    reports.pop(ip)
+                    logger.info(f"已删除`{ip}`的扫描结果！")
+                i += 1
+            return CommandReturnCode.SUCCESS
+        elif args.view:
+            ID = args.view
+            i = 1
+            for ip in reports:
+                if ID == i:
+                    table = [['端口号', '传输协议', '服务名', '描述']]
+                    for p in reports[ip].port_list:
+                        table.append([p.port, p.trans_type.name, p.name, p.note])
+                    print(tablor(table, border=False, title=ip))
+                    return CommandReturnCode.SUCCESS
+                i += 1
+            logger.error(f"不存在的ID`{ID}`！")
         else:
-            logger.info(f"Proceed alive host detection, use `{'UDP' if args.host_detect_udp else 'PING'}` method.")
-        logger.info(f"{'Not proceed' if args.udp is None and args.tcp is None else 'Proceed'} {'`UDP`' if args.udp is not None else ''} {'`TCP`' if args.tcp is not None else ''} port scan.")
-        if not args.nodetect:# 主机存活检测
-            self.host_survival_scan(hosts, args.timeout, args.threads, args.host_detect_udp)
-            hosts = [ip for ip in self._scan_result]
-            print('')
-        if args.tcp is not None:
-            tcp_ports = self._parse_ports(args.tcp)
-            for ip in hosts:
-                self.port_scan(ip, args.timeout, tcp_ports, False, args.threads)
-                print('')
-        if args.udp is not None:
-            udp_ports = self._parse_ports(args.udp, True)
-            for ip in hosts:
-                self.port_scan(ip, args.timeout, udp_ports, True, args.threads)
-                print('')
+            table = [['ID', '存活IP', '存活端口数量']]
+            i = 1
+            for ip, m in reports.items():
+                table.append([i, ip, m.count])
+                i += 1
+            print(tablor(table, border=False))
+            return CommandReturnCode.SUCCESS
+        return CommandReturnCode.FAIL
 
-        self.show_last_result()
-        return self.SUCCESS
+    def _scan(self, args:argparse.Namespace)->CommandReturnCode:
+        trans_type = TransType.from_name(args.type)
+        hosts = self._parse_hosts(args.hosts)
+        ports_map = self._parse_ports(args.ports, trans_type)
+
+        if not hosts:
+            logger.error("无可用IP!")
+            return CommandReturnCode.FAIL
+
+        logger.info(f"使用`{args.threads}`个线程进行扫描")
+        if args.nodetect:
+            logger.info("不进行主机存活扫描!")
         
-    def _parse_ports(self, ports:list, isudp=False)->list:
+        if not args.nodetect:# 主机存活检测
+            logger.info(f"进行主机存活扫描, 使用`{'UDP' if args.host_detect_udp else 'PING'}`方法.")
+            logger.info(f"扫描主机范围`{args.hosts}`")
+            hosts = self.host_survival_scan(hosts, args.timeout, args.threads, args.host_detect_udp)
+
+        logger.info(f"进行`{args.ports if args.ports else '默认'}`端口扫描, 扫描类型为`{trans_type.name}`")
+        for ip in hosts:
+            m = self.port_scan(ip, args.timeout, ports_map, args.threads)
+            self.save_report(ip, m.port_list)
+        logger.info("所有端口扫描完毕！")
+        return CommandReturnCode.SUCCESS
+
+    def run(self, args: Cmdline)-> CommandReturnCode:
+        args = self.parse.parse_args(args.options)
+        if hasattr(args, 'func'):
+            return args.func(args)
+        self.parse.error("未提供子命令！")
+        return CommandReturnCode.FAIL
+        
+    def _parse_ports(self, ports:list, trans_type:TransType)->ServicePortMap:
         '''解析端口范围，返回端口列表
         '''
-        ret = []
-        default_ports = self.default_udp_ports if isudp else self.default_tcp_ports
+        if self.default_ports is None:
+            self.default_ports = ServicePortMap(os.path.join(os.path.dirname(__file__), 'service-names-port-numbers.csv'))
+        ret = ServicePortMap()
+        trans_type_list = []
+        if TransType.ALL == trans_type:
+            trans_type_list = [TransType.TCP, TransType.UDP]
+        else:
+            trans_type_list = [trans_type]
         if not ports:
-            return default_ports
+            return self.default_ports
         for p in ports:
             min_port = 0
             max_port = 0
@@ -161,17 +264,19 @@ class PortScanPlugin(Plugin, Command):
                 else:
                     min_port = max_port = int(p)
                 for port in range(min_port, max_port+1):
-                    pp = Port(port, Port.UDP if isudp else Port.TCP, '')
-                    tmp = [t for t in default_ports if t.port==pp.port]
-                    if tmp:
-                        pp = tmp[0]
-                    ret.append(pp)
-            except:
-                logger.error(f"Port `{p}` format error!")
+                    for t in trans_type_list:
+                        pp = self.default_ports.get(port, t)
+                        if pp:
+                            ret.append_port(pp)
+                        else:
+                            ret.append(port, t, 'unknow')
+            except Exception as e:
+                print(e)
+                logger.error(f"端口`{p}`解析失败!")
         return ret
 
 
-    def _parse_hosts(self, hosts:list)->list:
+    def _parse_hosts(self, hosts:List[str])->List[str]:
         '''解析ip范围，返回ip字符串的列表
         '''
         ret = []
@@ -208,32 +313,15 @@ class PortScanPlugin(Plugin, Command):
                 logger.error(f"Host `{h}` format error!")
             
         return ret
-        
-    def show_last_result(self):
-        if self._scan_result:
-            hosts = [['Host', 'Opened Ports Count']]
-            ports_list = []
-            for ip in self._scan_result:
-                hosts.append([ip, len(self._scan_result[ip])])
-                ports = {'ip':ip, 'ports':[['Port', 'Note']]}
-                for p in self._scan_result[ip]:
-                    ports['ports'].append([f"{p.port}/{p.type}", p.note])
-                ports_list.append(ports)
-            print(tablor(hosts, border=False, title="Alive Host"))
-            for p in ports_list:
-                if len(p['ports']) > 1:
-                    print(tablor(p['ports'], border=False, title=p['ip']))
-            return
-        print(colour.colorize('No scan result info!', ['bold', 'note'], 'red'))
 
     def _update_port_note_by_response(self, port:Port):
         '''根据响应修改端口的说明
         '''
         if port.note:# 有默认说明的暂时不识别
             return
-        if not port.response:
+        if not hasattr(port, 'response'):
             return
-        text = port.response.decode(self.session.client.options.encoding, 'ignore')
+        text = port.response.decode(self.session.options.get_option('encoding').value, 'ignore')
         if re.match(r'(?i)HTTP/\d+\.\d+ \d+ .*\r\n', text):
             port.note = "http"
         elif re.match(r'(?i)SSH-', text):
@@ -241,16 +329,14 @@ class PortScanPlugin(Plugin, Command):
         else:
             port.note = f"Unknown service[{text[:50].strip()}]"
 
-    def _port_scan_handler(self, ports_list:list, ip:str, connect_timeout:int, isudp: bool)-> tuple:
+    def _port_scan_handler(self, ports_list:List[Port], ip:str, connect_timeout:int)-> tuple:
         '''端口扫描处理函数
         '''
         result = []
-        self.session.client.options.set_temp_option('timeout', 30)
-        self.session.client.options.set_temp_option('verbose', 1)
-        ret = self.evalfile("payload/port_scan", ip=ip, ports=','.join([str(i.port) for i in ports_list]), isudp=isudp, timeout=connect_timeout)
-        ret = ret.data
+        ret = self.session.evalfile("port_scan", dict(ip=ip, ports=','.join([str(i.port) for i in ports_list]), 
+            isudp=','.join([('1' if p.trans_type==TransType.UDP else '0') for p in ports_list]), timeout=connect_timeout), 30, True)
         if ret is None:
-            logger.error(f"Scan {'UDP' if isudp else 'TCP'} port on {ip} error!"+' '*20)
+            logger.error(f"{ip}端口扫描错误!"+' '*20)
             return result, len(ports_list)
         ret = json.loads(ret)
         if ret:
@@ -261,17 +347,30 @@ class PortScanPlugin(Plugin, Command):
                         self._update_port_note_by_response(port)
                         result.append(port)
                         p = colour.colorize(str(p).rjust(5), 'bold', 'yellow')
-                        logger.info(f"{'UDP' if isudp else 'TCP'} port {p} is opened on {ip}!"+' '*20, True)
+                        logger.info(f"{ip}开放了{port.trans_type.name}端口{p}!"+' '*20, True)
                         break
         return result, len(ports_list)
 
-    def port_scan(self, ip:str, connect_timeout:int, ports:list, isudp: bool, threads: int):
-        logger.info(f"Start {'UDP' if isudp else 'TCP'} port scan on {ip}...")
+    def port_scan(self, ip:str, connect_timeout:int, ports_map:ServicePortMap, threads: int)->ServicePortMap:
+        """对指定IP进行端口扫描
+
+        Args:
+            ip (str): 指定IP地址
+            connect_timeout (int): 连接超时时间
+            ports_map (ServicePortMap): 端口列表
+            threads (int): 扫描线程数量
+
+        Returns:
+            ServicePortMap: 返回开放的端口列表
+        """
+        logger.info(f"开始扫描`{ip}`的端口...")
+        ret = ServicePortMap()
         block_ports = []
+        ports = ports_map.port_list
         for i in range(0, len(ports), 10):#每次检测10个端口
             block_ports.append(ports[i:i+10])
         job = Worker(self._port_scan_handler, block_ports, threads)
-        job.set_param(ip, connect_timeout, isudp)
+        job.set_param(ip, connect_timeout)
         job.start()
         try:
             while job.is_running():
@@ -282,76 +381,83 @@ class PortScanPlugin(Plugin, Command):
                         opened_count += len(v.ret[0])
                         workdone_count += v.ret[1]
                 per = int(workdone_count/len(ports)*100)
-                print(f"Progress {per}% ({workdone_count}/{len(ports)}), {opened_count} opened ports on {ip}.", end='\r', flush=True)
-                utils.sleep(0.3)
-        except:
+                print(f"端口扫描进度 {per}% ({workdone_count}/{len(ports)}), {ip}开放了{opened_count}个端口.", end='\r' if workdone_count<len(ports) else '\n', 
+                    flush=True)
+                time.sleep(0.3)
+        except BaseException as e:
+            if isinstance(e, KeyboardInterrupt):
+                logger.info("正在暂停扫描进程..."+' '*60)
             job.stop()
-            logger.warning("Work is over!")
+            logger.warning("端口扫描停止!")
 
         for v in job.current_vlist:# 线程结束后统计
-            if self._scan_result.get(ip) is None:
-                self._scan_result[ip] = []
-            self._scan_result[ip].extend(v.ret[0])
-        logger.info(f"All {'UDP' if isudp else 'TCP'} ports have been detected, total `{len(self._scan_result[ip])}` opened on {ip}."+' '*20)
+            if v.solved:
+                ret.add_from_list(v.ret[0])
+        logger.info(f"端口扫描完毕, {ip}一共开放了`{len(ret.port_list)}`个端口."+' '*20)
+        return ret
 
     def _host_survival_scan_handler_by_udp(self, ip_list:list, timeout:int)-> tuple:
         '''使用UDP探测主机是否存活
         '''
         result = []
-        self.session.client.options.set_temp_option('timeout', 0)
-        self.session.client.options.set_temp_option('verbose', 1)
-        ret = self.evalfile('payload/host_scan', hosts=','.join(ip_list), timeout=timeout)
-        if not ret.is_success():
-            logger.error(f"Scan host error!"+' '*30)
+        ret = self.session.evalfile('host_scan', dict(hosts=','.join(ip_list), timeout=timeout), 0, True)
+        if ret is None:
+            logger.error(f"UDP主机扫描错误！"+' '*30)
             return result, len(ip_list)
-        ret = ret.data
         ret = json.loads(ret)
         for ip in ret:
             result.append(ip)
             ip = colour.colorize(ip.ljust(15), 'bold', 'yellow')
-            logger.info(f"{ip} is alive!"+' '*20, True)
+            logger.info(f"{ip} 存活!"+' '*20, True)
         return result, len(ip_list)
 
     def _host_survival_scan_handler_by_ping(self, ip_list:list, timeout:int)-> tuple:
         '''使用ping命令探测主机是否存活
         '''
         result = []
-        ret = ''
-        if self.session.server_info.isWindows():
+        ret = b''
+        if self.session.server_info.os_type == OSType.WINDOWS:
             ips = ','.join(ip_list)
-            self.session.client.options.set_temp_option('timeout', 0)
-            ret = self.exec_command(f'cmd /c "for %i in ({ips}) do ping -n 1 -w {timeout} %i && echo %iok"')
+            ret = self.session.exec(f'cmd /c "for %i in ({ips}) do ping -n 1 -w {timeout} %i && echo %iok"'.encode(), 0)
         else:
             ips = ' '.join(ip_list)
-            self.session.client.options.set_temp_option('timeout', 0)
-            ret = self.exec_command(f'for ip in {ips};do ping -c 1 -W {timeout//1000} $ip && echo $ip"ok";done')
+            ret = self.session.exec(f'for ip in {ips};do ping -c 1 -W {timeout//1000} $ip && echo $ip"ok";done'.encode(), 0)
 
         if ret is None:
-            logger.error("host_survival_scan_handler_by_ping error!")
+            logger.error("PING扫描发生错误!")
             return result, len(ip_list)
             
-        ret = re.findall(r'^\s*(\d+\.\d+\.\d+\.\d+)ok\s*$', ret, re.M)
+        ret = re.findall(r'^\s*(\d+\.\d+\.\d+\.\d+)ok\s*$', ret.decode(errors='ignore'), re.M)
         for ip in ret:
             result.append(ip)
             ip = colour.colorize(ip.ljust(15), 'bold', 'yellow')
-            logger.info(f"{ip} is alive!"+' '*20, True)
+            logger.info(f"{ip} 存活!"+' '*20, True)
         return result, len(ip_list)
 
-    def host_survival_scan(self, hosts:str, timeout:int, threads:int, host_detect_udp: bool):
-        '''测试主机是否存活，timeout超时时间，单位毫秒
-        '''
-        logger.info("Start host survival detection...")
+    def host_survival_scan(self, hosts:List[str], timeout:int, threads:int, host_detect_udp: bool)->List[str]:
+        """测试主机是否存活
+
+        Args:
+            hosts (List[str]): 主机ip地址列表
+            timeout (int): 扫描超时时间，单位毫秒
+            threads (int): 扫描线程数量
+            host_detect_udp (bool): 是否使用UDP进行主机存活检测
+
+        Returns:
+            List[str]: 返回存活的主机列表
+        """
+        ret = []
         if not host_detect_udp:# 若使用ping扫描，则检查是否有ping命令使用权限
-            ret = None
-            if self.session.server_info.isWindows():
-                ret = self.exec_command(f'cmd /c "ping -n 1 -w {timeout} 127.0.0.1 && echo pingok"')
+            tmp = b''
+            if self.session.server_info.os_type == OSType.WINDOWS:
+                tmp = self.session.exec(f'cmd /c "ping -n 1 -w {timeout} 127.0.0.1 && echo pingok"'.encode())
             else:
-                ret = self.exec_command(f'ping -c 1 -W {timeout//1000} 127.0.0.1 && echo pingok')
-            if ret is not None and 'pingok' in ret:
-                logger.info("Ping scan is currently available!")
+                tmp = self.session.exec(f'ping -c 1 -W {timeout//1000} 127.0.0.1 && echo pingok'.encode())
+            if tmp and b'pingok' in tmp:
+                logger.info("远程主机拥有PING权限!")
             else:
-                logger.error("Currently, there is no permission to use ping command, or ping command does not exist!")
-                return
+                logger.error("远程主机无法执行ping命令，可能权限不够或者不存在ping命令")
+                return ret
         block_hosts = []
         for i in range(0, len(hosts), 10):#每次检测10个主机
             block_hosts.append(hosts[i:i+10])
@@ -367,31 +473,23 @@ class PortScanPlugin(Plugin, Command):
                         alive_count += len(v.ret[0])
                         workdone_count += v.ret[1]
                 per = int(workdone_count/len(hosts)*100)
-                print(f"Progress {per}% ({workdone_count}/{len(hosts)}), {alive_count} alive hosts.", end='\r', flush=True)
-                utils.sleep(0.3)
+                print(f"进度 {per}% ({workdone_count}/{len(hosts)}), {alive_count}个存活主机.", end='\r' if workdone_count<len(hosts) else '\n', flush=True)
+                time.sleep(0.3)
         except:
             job.stop()
-            logger.warning("Work is over!")
+            logger.warning("扫描停止!")
         
         for v in job.current_vlist:# 线程结束后统计
             for ip in v.ret[0]:
-                self._scan_result[ip] = []
-        logger.info(f"All hosts have been detected, total `{len(self._scan_result)}` alive."+' '*20)
+                ret.append(ip)
+        logger.info(f"主机存活扫描完毕, 一共`{len(ret)}`个存活")
+        return ret
 
-
-    def hook_loaded(self):
-        config = self.load_config('portscan-last-result')
-        if config is None:
-            return
-        
-        self._scan_result = {}
-        for ip, ports in config.items():
-            self._scan_result[ip] = [Port.from_json(p) for p in ports]
-
-    def hook_destroy(self):
-        config = {}
-        for ip, ports in self._scan_result.items():
-            config[ip] = [Port.to_json(p) for p in ports]
-        self.save_config('portscan-last-result', config)
-
-exploit.load_default_ports()
+    def docomplete(self, text: str)-> List[str]:
+        result = []
+        match = re.fullmatch(r'(%s +)(\w*)'%self.command_name, text)
+        if match:
+            for key in ['scan', 'report']:
+                if key.startswith(match.group(2).lower()):
+                    result.append(match.group(1)+key+' ')
+        return result

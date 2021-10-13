@@ -1,6 +1,7 @@
 import threading
 import math
 import copy
+from typing import List
 
 class ValueState:
     def __init__(self, value, solved: bool, ret):
@@ -75,5 +76,5 @@ class Worker:
             self._lock.release()
 
     @property
-    def current_vlist(self)->list:
+    def current_vlist(self)->List[ValueState]:
         return copy.deepcopy(self.vlist)
