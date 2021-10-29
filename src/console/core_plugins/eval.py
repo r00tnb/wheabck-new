@@ -52,13 +52,14 @@ class EvalPlugin(Plugin, Command):
             payload = r'''
             function run($vars){
                 extract($vars);
+                chdir('%s');
                 ob_start();
                 %s
                 $result = ob_get_contents();
                 ob_end_clean();
                 return $result;
             }
-            '''%payload
+            '''%(self.session.server_info.pwd, payload)
         ret = self.session.eval(Payload.create_payload(payload.encode(), self.analysis_vars(vars), self.session.session_type))
         if ret is not None:
             print(ret.decode(self.session.options.get_option('encoding').value))

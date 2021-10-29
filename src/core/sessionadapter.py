@@ -223,9 +223,10 @@ class SessionAdapter(Session):
         if value is None:
             connection_manager.del_json_data(self.config.conn_id, name)
         elif connection_manager.get_json_data(self.config.conn_id, name) is None:
-            connection_manager.add_json_data(self.config.conn_id, name, value)
+            return connection_manager.add_json_data(self.config.conn_id, name, value)
         else:
-            connection_manager.update_json_data(self.config.conn_id, name, value)
+            return connection_manager.update_json_data(self.config.conn_id, name, value)
+        return True
 
     def eval(self, payload: Payload, timeout: float = -1) -> Union[bytes, None]:
         code = payload.code

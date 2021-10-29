@@ -78,7 +78,9 @@ class ServerInfo:
         self.tmpdir:str = None # 服务器临时目录
         self.sep:str = '/' # 服务器目录分割符
         self.os_bit:int = 32 # 服务器操作系统位数
-        self.webshell_addr = None # webshell脚本文件地址
+        self.webshell_addr:str = None # webshell脚本文件地址
+        self.www_root:str = None  # 网站根目录地址
+        self.website:str = None # webshell所在网站url，如：http://xxx.com:80
 
     @property
     def server_name(self)->str:

