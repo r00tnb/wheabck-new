@@ -86,6 +86,8 @@ class NormalShell(BaseShell):
                 self.last_recv = msg
                 self._lock.release()
                 print(msg, end="", flush=True)
+            else:
+                logger.error(f"未知错误！接收到：{ret}")
         self.close()
     
     def start_shell(self):
@@ -93,10 +95,12 @@ class NormalShell(BaseShell):
         if ret is None:
             logger.warning("请求`start_shell`已经退出, 如果shell仍正常运行请忽略该警告")
             return
-        if ret == "-1":
+        if ret == b"-1":
             logger.error("无法运行shell，远程服务器缺少必要的运行库!")
-        elif ret == "-2":
+        elif ret == b"-2":
             logger.error("交互式shell进程开启失败!")
+        else:
+            logger.error(f"未知错误！接收到：{ret}")
         self.close()
     
     def cmdloop(self):

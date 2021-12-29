@@ -36,7 +36,7 @@ class NamedpipeUnixShell(BaseShell):
         self.close()
 
     def _keep_shell_alive(self):# 连接到管道保持shell一直存活
-        self.session.exec(f"mkfifo {self.in_pipe} {self.out_pipe} && chmod 777 {self.in_pipe} {self.out_pipe}") # 先尝试使用命令创建管道
+        self.session.exec(f"mkfifo {self.in_pipe} {self.out_pipe} && chmod 777 {self.in_pipe} {self.out_pipe}".encode()) # 先尝试使用命令创建管道
         ret = self.session.evalfile('interact_namedpipe/unix/keep', dict(outpipe=self.out_pipe, inpipe=self.in_pipe, pwd=self.session.server_info.pwd),0)
         if ret is None:
             logger.error("`Keep_shell_alive`错误!")

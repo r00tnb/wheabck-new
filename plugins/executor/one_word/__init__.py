@@ -4,6 +4,7 @@ import requests
 from api import Plugin, Session, CodeExecutor, ServerInfo, OSType, Command, SessionType, logger, utils, SessionOptions
 import json, base64, re
 import traceback
+from urllib.parse import urlparse
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -51,6 +52,8 @@ class AdvancedExecutor(Plugin, CodeExecutor):
                     info[k] = OSType.WINDOWS
                 else:
                     info[k] = OSType.OTHER
+        u = urlparse(self.session.options.get_option('target').value)
+        info['website'] = f'{u.scheme}://{u.netloc}'
         return ServerInfo.from_dict(info)
 
     def get_end_payload(self, payload:bytes, delimiter:bytes)->bytes:

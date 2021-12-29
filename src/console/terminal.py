@@ -63,7 +63,6 @@ class Terminal:
 
         self.manager_session = ManagerSession()
 
-
     @property
     def session(self)->SessionAdapter:
         '''返回当前正在使用的session对象

@@ -87,5 +87,5 @@ function run($vars){
     }else{
         return "-1";
     }
-    echo "1";
+    return "1";
 }

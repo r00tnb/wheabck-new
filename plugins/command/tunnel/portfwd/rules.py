@@ -221,7 +221,7 @@ class ForwardRule(Rule):
             if not self.isudp:
                 self.sock.listen(self.max_listen_count)
         except OSError as e:
-            logger.error("地址绑定错误： "+e)
+            logger.error(f"地址绑定错误： {e}")
             return
         thread_list = []
         while True:
