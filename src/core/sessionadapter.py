@@ -52,10 +52,10 @@ class SessionAdapter(Session):
         if self.__code_executor is not None:
             if self.config.session_type not in self.__code_executor.supported_session_types or not self.__code_executor.on_loading(self):
                 raise SessionInitError(
-                    f'Code executor with ID {self.config.options.get_option("code_executor_id").value} is not support the session!')
+                    f'代码执行器`{self.config.options.get_option("code_executor_id").value}`不支持当前session!')
         elif strict:
             raise SessionInitError(
-                f'Code executor with ID {self.config.options.get_option("code_executor_id").value} is not found!')
+                f'代码执行器`{self.config.options.get_option("code_executor_id").value}`未找到!')
 
         self.__payload_wrapper: Wrapper = plugin_manager.get_wrapper(self.config.options.get_option('wrapper_id').value)
         if self.__payload_wrapper is None or self.session_type not in self.__payload_wrapper.supported_session_types or \
@@ -151,21 +151,20 @@ class SessionAdapter(Session):
         Returns:
             bool: 成功返回True，否则False
         """
-        logger.info(f"Connecting to target `{self.options.get_option('target').value}`...")
+        logger.info(f"正在连接到目标`{self.options.get_option('target').value}`...")
         try:
             self.config.server_info = self.__code_executor.get_server_info()
         except BaseException as e:
-            raise e
-            logger.error(f"Failed to get basic server information, reason: {e}")
+            logger.error(f"获取服务器基本信息失败！原因: {e}")
             return False
         if self.config.server_info is None:
-            logger.error(f"Failed to get basic server information")
+            logger.error(f"获取服务器基本信息失败！未知原因！")
             return False
 
         self.additional_data.prompt = lambda :colour.colorize(self.server_info.server_name, 'bold', 'purple')+\
             ':'+colour.colorize(self.server_info.pwd, 'bold', 'blue')+colour.colorize('\n> ', 'bold')
-        logger.info(f"`{self.load_all_plugins()}` plugins loaded")
-        logger.info(f"Session `{self.session_id}` initialization completed")
+        logger.info(f"共加载`{self.load_all_plugins()}`个插件")
+        logger.info(f"Session `{self.session_id}` 初始化完成！")
         return True
 
 

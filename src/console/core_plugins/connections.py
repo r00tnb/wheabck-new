@@ -91,9 +91,9 @@ class ConnectionPlugin(Plugin, Command):
             CommandReturnCode: 命令返回码
         """
         if connection_manager.copy_connection(conn_id):
-            logger.info('A connection was copied')
+            logger.info('连接已被复制！')
             return CommandReturnCode.SUCCESS
-        logger.error(f'`{conn_id}`` connection copy failed')
+        logger.error(f'连接`{conn_id}`复制失败！')
         return CommandReturnCode.FAIL
 
     def save_session(self, session_id:str)->CommandReturnCode:
@@ -114,12 +114,12 @@ class ConnectionPlugin(Plugin, Command):
             conn_id = connection_manager.add_or_update_connection(s.config)
             if conn_id!=-1:
                 s.config.conn_id = conn_id
-                logger.info(f"Save session `{session_id}` to connection successfully", True)
+                logger.info(f"保存session`{session_id}`到连接成功！", True)
                 return CommandReturnCode.SUCCESS
             else:
-                logger.error(f"Failed to save session `{session_id}` to connection")
+                logger.error(f"保存session`{session_id}`失败！")
         else:
-            logger.error(f"Session `{session_id}` does not exist")
+            logger.error(f"session`{session_id}`不存在！")
         return CommandReturnCode.FAIL
 
     def delete_connections(self, ids:List[int])->CommandReturnCode:
@@ -138,11 +138,11 @@ class ConnectionPlugin(Plugin, Command):
         for conn in connection_manager.get_all_connections():
             if conn.conn_id in ids or delall:
                 connection_manager.del_connection(conn.conn_id)
-                logger.info(f"Deleted connection `{conn.conn_id}` successfully")
+                logger.info(f"删除连接`{conn.conn_id}`成功")
                 ok_ids.append(conn.conn_id)
         tmp = [str(ID) for ID in ids if ID not in ok_ids]
         if tmp and not delall:
-            logger.warning(f"Connections `{','.join(tmp)}` not exists")
+            logger.warning(f"连接`{','.join(tmp)}`失败！")
             return CommandReturnCode.PARTIAL_SUCCESS
         return CommandReturnCode.SUCCESS
     
@@ -164,7 +164,7 @@ class ConnectionPlugin(Plugin, Command):
         """
         conn = connection_manager.get_connection(conn_id)
         if conn is None:
-            logger.error(f"Connection `{conn_id}` not exists")
+            logger.error(f"连接`{conn_id}`不存在！")
             return CommandReturnCode.FAIL
         self.manager_session.config.conn_id = conn.conn_id
         self.manager_session.call_command(Cmdline(['set', 'code_executor_id', conn.options.get_option('code_executor_id').value]))
@@ -176,7 +176,7 @@ class ConnectionPlugin(Plugin, Command):
     def list_connections(self):
         """列出保存的连接
         """
-        table = [['Conn ID', 'Type', 'Target']]
+        table = [['连接ID', '类型', '目标']]
         for conn in connection_manager.get_all_connections():
             table.append([conn.conn_id, conn.session_type.name, conn.options.get_option('target').value])
-        print(tablor(table, border=False, title="Connections Table"))
+        print(tablor(table, border=False, title="连接列表"))

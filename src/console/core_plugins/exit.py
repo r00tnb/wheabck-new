@@ -6,7 +6,7 @@ def get_plugin_class():
 
 class ExitPlugin(Plugin, Command):
     name = 'exit'
-    description = 'Exit command'
+    description = '退出程序'
     command_name = 'exit'
     command_type = CommandType.CORE_COMMAND
 

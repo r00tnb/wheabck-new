@@ -32,6 +32,14 @@ class PromptTimePlugin(Plugin, Command):
         self.raw_prompt = self.session.additional_data.prompt
         self.session.additional_data.prompt = self.my_prompt
 
+        data = self.session.load_json(self.name)
+        if data:
+            self.on = data.get('on', True)
+
+
+    def on_destroy(self):
+        self.session.save_json(self.name, {'on':self.on})
+
 
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
         args = self.parse.parse_args(cmdline.options)

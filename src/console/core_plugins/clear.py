@@ -6,7 +6,7 @@ def get_plugin_class():
 
 class ClearPlugin(Plugin, Command):
     name = 'clear'
-    description = 'Empty console'
+    description = '清空控制台输出'
     command_name = 'clear'
     command_type = CommandType.CORE_COMMAND
 
