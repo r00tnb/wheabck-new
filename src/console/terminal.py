@@ -77,12 +77,11 @@ class Terminal:
         '''
         print('')
         try:
-            if input(colour.colorize(f"Are you sure exit?(y/n) ", 'bold')).lower() == 'y':
-                return CommandReturnCode.EXIT
+            return self.manager_session.call_command(['exit'])
         except KeyboardInterrupt:
             print('')
             return CommandReturnCode.EXIT
-        return CommandReturnCode.FAIL
+        #return CommandReturnCode.FAIL
     
     def exception_handler(self, args: Cmdline, e: BaseException) -> CommandReturnCode:
         '''处理异常
