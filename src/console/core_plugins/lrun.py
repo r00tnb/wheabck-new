@@ -6,13 +6,13 @@ def get_plugin_class():
 
 class ClearPlugin(Plugin, Command):
     name = 'lrun'
-    description = 'Run local system commands'
+    description = '运行本地系统命令'
     command_name = 'lrun'
     command_type = CommandType.CORE_COMMAND
 
     def __init__(self):
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('cmd', help="Local system command")
+        self.parse.add_argument('cmd', help="本地系统命令")
         self.help_info = self.parse.format_help()
 
     def on_loading(self, session: Session) -> bool:

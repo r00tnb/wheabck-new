@@ -1,3 +1,4 @@
+#!/bin/python3
 from posixpath import join
 from typing import Dict
 from src.console import terminal

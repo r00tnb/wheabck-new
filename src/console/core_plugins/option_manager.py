@@ -15,7 +15,7 @@ changeless_options = ('preferred_session_type', 'code_executor_id', 'wrapper_id'
 
 class OptionManagerPlugin(Plugin):
     name = 'option manager'
-    description = 'Manage the option information of the current session'
+    description = '管理当前session的设置信息'
 
     def __init__(self):
         pass
@@ -35,7 +35,7 @@ class OptionManagerPlugin(Plugin):
 
 class SetCommand(Command):
 
-    description = 'Change the option value of the current session'
+    description = '设置当前session的选项'
     command_name = 'set'
     command_type = CommandType.CORE_COMMAND
 
@@ -43,8 +43,8 @@ class SetCommand(Command):
         self.session = session
 
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('name', help="Ooption name")
-        self.parse.add_argument('value', help="Options value")
+        self.parse.add_argument('name', help="选项名")
+        self.parse.add_argument('value', help="选项值")
         self.help_info = self.parse.format_help()
 
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
@@ -81,12 +81,12 @@ class SetCommand(Command):
         """
         ce = plugin_manager.plugins_map.get(ID)
         if ce is None or not issubclass(ce, CodeExecutor):
-            logger.error(f'Code executor not found with ID `{ID}`')
+            logger.error(f'代码执行器`{ID}`没找到！')
             return CommandReturnCode.FAIL
         
         st = SessionType[self.session.options.get_option('preferred_session_type').value.upper()]
         if st not in ce.supported_session_types:
-            logger.error(f"The code executor does not support the current session type `{st.name}`")
+            logger.error(f"代码执行器不支持session类型`{st.name}`")
             return CommandReturnCode.FAIL
 
         self.session.config.session_type = SessionType[self.session.options.get_option('preferred_session_type').value]
@@ -160,13 +160,13 @@ class SetCommand(Command):
 
 class ShowCommand(Command):
 
-    description = "Displays the current session option information"
+    description = "显示session信息"
     command_name = 'show'
     command_type = CommandType.CORE_COMMAND
 
     def __init__(self, session:SessionAdapter) -> None:
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('option', help="Information type", choices=['options'], nargs='?', default='options')
+        self.parse.add_argument('option', help="信息类型", choices=['options'], nargs='?', default='options')
         self.help_info = self.parse.format_help()
         self.session = session
 
@@ -179,7 +179,7 @@ class ShowCommand(Command):
         return CommandReturnCode.FAIL
 
     def show_options(self):
-        table = [['Name', 'Value', 'Description']]
+        table = [['选项名', '值', '描述']]
         for name, v in self.session.options.options_map.items():
             if name in changeless_options and not isinstance(self.session, ManagerSession):
                 name = colour.colorize(name, ['bold', 'invert'])

@@ -8,7 +8,7 @@ def get_plugin_class():
 
 class SessionManage(Plugin, Command):
     name = 'sessions'
-    description = "Manage session"
+    description = "管理session"
     command_name = 'sessions'
     command_type = CommandType.CORE_COMMAND
 
@@ -16,9 +16,9 @@ class SessionManage(Plugin, Command):
 
     def __init__(self):
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('-i', '--interact', help="Switch to the specified session with session id")
-        self.parse.add_argument('-k', '--kill', help="Delete the specified session with session id(If not specified, all sessions will be deleted)", nargs='*')
-        self.parse.add_argument('-l', '--list', help="List all active sessions", action='store_true')
+        self.parse.add_argument('-i', '--interact', help="根据session id切换到指定session")
+        self.parse.add_argument('-k', '--kill', help="根据session id删除指定session(若不指定session id则删除所有session)", nargs='*')
+        self.parse.add_argument('-l', '--list', help="列出当前存在的session", action='store_true')
         self.help_info = self.parse.format_help()
 
     def on_loading(self, session: Session) -> bool:
@@ -53,9 +53,9 @@ class SessionManage(Plugin, Command):
         for ID in self.manager_session.session_map.keys():
             if ID.startswith(session_id):
                 self.manager_session.set_current_session(ID)
-                logger.info(f"Switch to session `{ID}`")
+                logger.info(f"已切换到session`{ID}`")
                 return CommandReturnCode.SUCCESS
-        logger.error(f"No session with id `{session_id}`")
+        logger.error(f"未找到session`{session_id}`")
         return CommandReturnCode.FAIL
 
     def kill_session(self, ids:List[str])->CommandReturnCode:
@@ -80,17 +80,17 @@ class SessionManage(Plugin, Command):
             if not ok:
                 err_ids.append(ids[i])
         if err_ids:
-            logger.error(f"The specified session does not exist with ids `{','.join(err_ids)}`")
+            logger.error(f"指定的session`{','.join(err_ids)}`不存在！")
             return CommandReturnCode.FAIL
         for ID in ids:
             self.manager_session.del_session(ID)
-            logger.info(f"Deleted session with id `{ID}`", False)
+            logger.info(f"已删除session`{ID}`", False)
         return CommandReturnCode.SUCCESS
 
     def list_session(self):
         """列出所有活跃的session
         """
-        table = [['Session ID', 'Type', 'Target']]
+        table = [['sessionID', '类型', '目标']]
         active_id = 1
         for ID, session in self.manager_session.session_map.items():
             if session is not self.manager_session.current_session:
@@ -108,7 +108,7 @@ class SessionManage(Plugin, Command):
 
 class BgCommand(Command):
 
-    description = 'Switch the session to the background'
+    description = '将当前session切换到后台'
     command_name = 'bg'
     command_type = CommandType.CORE_COMMAND
 
@@ -120,5 +120,5 @@ class BgCommand(Command):
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
         s = self.session.current_session
         self.session.set_current_session(None)
-        logger.info(f"Background session `{s.session_id}`")
+        logger.info(f"已切换session`{s.session_id}`到后台！")
         return CommandReturnCode.SUCCESS

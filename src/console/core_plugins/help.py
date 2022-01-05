@@ -8,13 +8,13 @@ def get_plugin_class():
 
 class HelperCommand(Plugin, Command):
     name = 'help'
-    description = "Get command help information!"
+    description = "获得命令帮助信息"
     command_name = 'help'
     command_type = CommandType.CORE_COMMAND
 
     def __init__(self):
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('cmd', help="A command name",  nargs='?')
+        self.parse.add_argument('cmd', help="命令名称",  nargs='?')
         self.help_info = self.parse.format_help()
 
         self.session:SessionAdapter
@@ -27,7 +27,7 @@ class HelperCommand(Plugin, Command):
     def all_info(self)->str:
         '''返回所有命令的简短信息
         '''
-        cmd_info_map = {t:[['Name', 'Description']] for t in CommandType}
+        cmd_info_map = {t:[['命令名称', '描述']] for t in CommandType}
         ret = r'''
 开始一个webshell连接：
     1.set target http://xxx.com/1.php
@@ -67,7 +67,7 @@ class HelperCommand(Plugin, Command):
             if p.command_name == cmd:
                 s = p.help_info
                 if isinstance(p, Plugin):
-                    s = f"Plugin ID: {p.plugin_id}\n"+s
+                    s = f"插件ID: {p.plugin_id}\n"+s
                 return s
         return None
 
@@ -76,7 +76,7 @@ class HelperCommand(Plugin, Command):
         if args.cmd is not None:
             s = self.get_cmd_help(args.cmd)
             if s is None:
-                logger.error(f'No command named `{args.cmd}`')
+                logger.error(f'没找到命令`{args.cmd}`')
                 return CommandReturnCode.FAIL
             else:
                 print(s)
@@ -99,7 +99,7 @@ class HelperCommand(Plugin, Command):
         return matchs
 
 class HelpAliasCommand(Command):
-    description = "This is an alias for `help`"
+    description = "这是命令`help`的别名"
     command_name = '?'
     command_type = CommandType.CORE_COMMAND
 

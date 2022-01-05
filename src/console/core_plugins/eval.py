@@ -19,9 +19,9 @@ class EvalPlugin(Plugin, Command):
 
     def __init__(self):
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('payload', help="String payload", nargs='?')
-        self.parse.add_argument('-f', '--file', help="Indicates the path to the payload file")
-        self.parse.add_argument('-v', '--vars', help="Variables passed to payload, such as `-v test = 123 id = 123`", nargs='+')
+        self.parse.add_argument('payload', help="字符串形式的payload", nargs='?')
+        self.parse.add_argument('-f', '--file', help="要执行的payload文件路径")
+        self.parse.add_argument('-v', '--vars', help="要传递给payload的变量, 如`-v test = 123 id = 123`", nargs='+')
         self.help_info = self.parse.format_help()
 
     def on_loading(self, session: Session) -> bool:
@@ -43,7 +43,7 @@ class EvalPlugin(Plugin, Command):
             with open(path, 'rb') as f:
                 payload = f.read()
         except:
-            logger.error(f'Payload file path `{path}` not exist')
+            logger.error(f'payload文件`{path}`不存在！')
             return CommandReturnCode.FAIL
         return self.eval_payload(payload, vars)
 
@@ -65,7 +65,7 @@ class EvalPlugin(Plugin, Command):
             print(ret.decode(self.session.options.get_option('encoding').value))
             return CommandReturnCode.SUCCESS
         else:
-            logger.error("Eval failed")
+            logger.error("执行失败！")
         return CommandReturnCode.FAIL
 
     def analysis_vars(self, vars:List[str])->Dict[str, Any]:

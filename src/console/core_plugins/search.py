@@ -69,7 +69,7 @@ class SearchPlugin(Plugin, Command):
             if s(plugin_class):
                 last_search_results.append(plugin_class)
 
-        sl = [['Plugin ID', 'Type', 'Name', 'Description']]
+        sl = [['插件ID', '类型', '名称', '描述']]
         color_reg = [{
             'regexp': r"(?i)"+'|'.join([re.escape(k) for k in keywords_list]),
             'color': ['bold', 'red', '']
@@ -80,5 +80,5 @@ class SearchPlugin(Plugin, Command):
                 cc(', '.join([t.name for t in plugin_class.supported_session_types]), color_reg), 
                 cc(plugin_class.name, color_reg), 
                 cc(plugin_class.description, color_reg)])
-        print(tablor(sl, True, False, title="Search Result"))
+        print(tablor(sl, True, False, title="搜索结果"))
         return CommandReturnCode.SUCCESS

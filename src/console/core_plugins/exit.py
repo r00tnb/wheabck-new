@@ -12,7 +12,7 @@ class ExitPlugin(Plugin, Command):
 
     def __init__(self):
         self.parse = argparse.ArgumentParser(prog=self.command_name, description=self.description)
-        self.parse.add_argument('-y', help="Exit procedure without confirmation", action="store_true")
+        self.parse.add_argument('-y', help="退出而不询问", action="store_true")
         self.help_info = self.parse.format_help()
 
     def on_loading(self, session: Session) -> bool:
@@ -20,6 +20,6 @@ class ExitPlugin(Plugin, Command):
 
     def run(self, cmdline: Cmdline) -> CommandReturnCode:
         args = self.parse.parse_args(cmdline.options)
-        if not args.y and input('Are you sure you want to exit?(y/n) ').lower() != 'y':
+        if not args.y and input('确定退出吗?(y/n) ').lower() != 'y':
             return CommandReturnCode.FAIL
         return CommandReturnCode.EXIT
