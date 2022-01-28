@@ -1,3 +1,4 @@
+from typing import Tuple
 from api import logger, Session, Cmdline, CommandReturnCode, Command, CommandType, colour
 import argparse
 import base64
@@ -47,23 +48,41 @@ class DownloadCommand(Command):
                 logger.error(f"无法递归创建路径`{local_path}`，请手动创建或指定新路径！")
                 return CommandReturnCode.FAIL
         logger.info("正在下载...")
-        ret = self.download(source_path, local_path, args.recursive)
-        if ret == CommandReturnCode.SUCCESS:
-            logger.info("所有文件下载完毕!")
-        return ret
+        sf, sd, err = self.download(source_path, local_path, args.recursive)
+        logger.info("下载完毕！")
+        logger.info(f"共下载文件`{colour.colorize(str(sf), 'hold', 'green')}`个，目录`{sd}`个，下载失败`{colour.colorize(str(err), 'hold', 'red')}`个！")
+        if err:
+            if sf == 0 and sd == 0:
+                return CommandReturnCode.FAIL
+            else:
+                return CommandReturnCode.PARTIAL_SUCCESS
+        else:
+            return CommandReturnCode.SUCCESS
+        
 
-    def download(self, server_path: str, local_path: str, r: bool)-> CommandReturnCode:
+    def download(self, server_path: str, local_path: str, r: bool)-> Tuple[int, int, int]:
+        """下载远程文件到本地
+
+        Args:
+            server_path (str): 远程文件路径
+            local_path (str): 本地文件路径
+            r (bool): 递归下载
+
+        Returns:
+            Tuple[int, int, int]: 分别为成功下载文件的数量、目录的数量、失败下载的数量
+        """
         ret = self.session.evalfile('download', dict(pwd=self.session.server_info.pwd, path=server_path))
         if ret is None:
             logger.error(f"下载`{server_path}`发生错误!")
-            return CommandReturnCode.FAIL
+            return 0, 0, 1
         ret = json.loads(ret)
+        sf, sd, err = 0, 0, 0
         if ret['code'] == 1:
             with open(local_path, 'wb') as f:
                 data = base64.b64decode(ret['msg'].encode())
                 f.write(data)
             logger.info(f'下载文件`{server_path}`成功!', True)
-            return CommandReturnCode.SUCCESS
+            return sf+1, sd, err
         elif ret['code'] == 2:
             logger.error(f"服务器文件`{server_path}`不可读！权限不足！")
         elif ret['code'] == 0:
@@ -76,26 +95,25 @@ class DownloadCommand(Command):
             if r:# 递归的下载目录
                 logger.info(f'正在下载目录`{server_path}`...')
                 sep = ret['msg']
-                if not os.path.exists(local_path):
-                    os.mkdir(local_path)
                 ret = self.session.evalfile('listdir', dict(path=server_path, pwd=self.session.server_info.pwd))
                 if ret is None:
                     logger.error(f"列举目录`{server_path}`错误！目录下载失败！")
-                    return CommandReturnCode.FAIL
+                    return sf, sd, err+1
                 ret = json.loads(ret)
                 if ret['code'] == 1:
                     l = ret['list']
-                    tmp = CommandReturnCode.SUCCESS
+                    if not os.path.exists(local_path):
+                        os.mkdir(local_path)
                     for fname in l:
                         fname = base64.b64decode(fname.encode()).decode(self.session.options.get_option('encoding').value, 'ignore')
-                        if self.download(server_path+sep+fname, os.path.join(local_path, fname), r) != CommandReturnCode.SUCCESS:
-                            tmp = CommandReturnCode.PARTIAL_SUCCESS
-                    return tmp
+                        f, d, e = self.download(server_path+sep+fname, os.path.join(local_path, fname), r)
+                        sf, sd, err = sf+f, sd+d, err+e
+                    return sf, sd, err
                 else:
                     logger.error(f"列举目录`{server_path}`失败！目录下载失败！")
             else:
                 logger.error(f"服务器文件`{server_path}`是一个目录！你可以指定`-r`选项用于下载目录.")
         
-        return CommandReturnCode.FAIL
+        return sf, sd, err+1
 
         
